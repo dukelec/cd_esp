@@ -1,0 +1,18 @@
+diff --git a/components/esp_driver_spi/src/gpspi/spi_master.c b/components/esp_driver_spi/src/gpspi/spi_master.c
+index 47cd38262f..518410faf4 100644
+--- a/components/esp_driver_spi/src/gpspi/spi_master.c
++++ b/components/esp_driver_spi/src/gpspi/spi_master.c
+@@ -1221,7 +1221,12 @@ esp_err_t SPI_MASTER_ATTR spi_device_queue_trans(spi_device_handle_t handle, spi
+ #endif
+     //Send to queue and invoke the ISR.
+ 
+-    BaseType_t r = xQueueSend(handle->trans_queue, (void *)&trans_buf, ticks_to_wait);
++    // duke: https://github.com/espressif/esp-idf/issues/12855
++    //BaseType_t r = xQueueSend(handle->trans_queue, (void *)&trans_buf, ticks_to_wait);
++    BaseType_t task_woken = pdFALSE;
++    BaseType_t r = xQueueSendFromISR(handle->trans_queue, (void *)&trans_buf, &task_woken);
++    portYIELD_FROM_ISR(task_woken);
++
+     if (!r) {
+         ret = ESP_ERR_TIMEOUT;
+ #ifdef CONFIG_PM_ENABLE
