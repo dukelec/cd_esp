@@ -217,6 +217,8 @@ static inline void serial_cmd_dispatch(void)
                 frame->dat[1] = 0;
                 if (csa.proxy_sel == INTF_UDP) {
                     frame->w_hdr = 0xc0;
+                    if (frame->dat[0] != csa.p_mac)
+                        frame->w_hdr |= 0xa0;
                     if (udp_src_addr_valid) {
                         memcpy(&frame->udp_addr, &udp_src_addr, sizeof(udp_src_addr));
                         //ESP_LOGI(tag, "forward: rs485 -> udp client, frame: %p\n", frame);
@@ -224,6 +226,8 @@ static inline void serial_cmd_dispatch(void)
                     }
                 } else { // ble
                     frame->w_hdr = csa.k_en_ble ? 0xc0 : 0;
+                    if (frame->dat[0] != csa.p_mac)
+                        frame->w_hdr |= 0xa0;
                     //ESP_LOGI(tag, "forward: rs485 -> ble central, frame: %p\n", frame);
                     ret = xQueueSend(ble_notify_queue, (void *) &frame, (TickType_t) 0);
 

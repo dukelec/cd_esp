@@ -19,7 +19,7 @@ int udp_sock = -1;
 struct sockaddr_storage udp_src_addr; // large enough for both ipv4 or ipv6
 bool udp_src_addr_valid = false;
 static uint8_t rx_buf[4+1500+16] __attribute__((aligned(4))) = {0};
-static uint8_t tx_buf[4+3+253+16] __attribute__((aligned(4))) = {0};
+static uint8_t tx_buf[4+1500+16] __attribute__((aligned(4))) = {0};
 
 QueueHandle_t udp_notify_queue = NULL;
 
@@ -100,7 +100,7 @@ static void udp_server_task(void *arg)
     static char addr_str[128];
     static uint8_t src_ip[16];
     struct sockaddr_in6 ser_addr;
-    bool aes_cnt_err = false; // avoid multiple cnt err report
+    bool skip_err_rpt = false;
 
     while (true) {
         bzero(&ser_addr.sin6_addr.un, sizeof(ser_addr.sin6_addr.un));
@@ -151,12 +151,10 @@ static void udp_server_task(void *arg)
                 uint8_t tgt_mac;
                 uint8_t *cdn_buf;
                 uint16_t cdn_len;
-                uint8_t err_code = 0; // 1: frag err, 2: aes err, 3: intf busy
+                uint8_t err_code = 0; // 1: frag err, 2: aes err
 
-                if (len < 2) {
-                    err_code = 1;
-                    goto reply_err_code;
-                }
+                if (len < 2)
+                    continue;
 
                 if ((*cur_buf & 0x80) == 0) { // no w_hdr
                     w_hdr = 0;
@@ -169,22 +167,18 @@ static void udp_server_task(void *arg)
                     w_hdr = rx_buf[3];
                     cdn_len = len - 1;
                     cdn_buf = cur_buf + 1;
-                    if ((rx_buf[3] & 0x40) == 0)
+                    if ((rx_buf[3] & 0x40) == 0) // else decrypt
                         goto parse_w_hdr;
-                    else
-                        goto decrypt;
 
                 } else {
-                    err_code = 1; // frag err
-                    goto reply_err_code;
+                    continue;
                 }
 
-decrypt:
                 int plain_len = aes256_cbc_decrypt(cdn_buf, cdn_len, cdn_buf);
                 if (plain_len < 4 || get_unaligned16(cdn_buf) != csa.k_cnt_rx_udp) {
-                    err_code = 2; // aes err
                     ESP_LOGE(tag, "plain_len: %d, rx_cnt: %04x != %04x, %d",
-                            plain_len, get_unaligned16(cdn_buf), csa.k_cnt_rx_udp, aes_cnt_err);
+                            plain_len, get_unaligned16(cdn_buf), csa.k_cnt_rx_udp, skip_err_rpt);
+                    err_code = 2; // aes err
                     goto reply_err_code;
                 }
                 csa.k_cnt_rx_udp++;
@@ -208,7 +202,7 @@ parse_w_hdr:
                 }
 
 cdn_to_frame:
-                aes_cnt_err = false;
+                skip_err_rpt = false;
                 uint8_t *sub_buf = cdn_buf;
                 while (sub_buf < cdn_buf + cdn_len) {
                     int sub_len = min(253, cdn_len - (sub_buf - cdn_buf));
@@ -233,9 +227,9 @@ cdn_to_frame:
                 continue;
 
 reply_err_code:
-                if (aes_cnt_err)
+                if (skip_err_rpt)
                     continue;
-                aes_cnt_err = true;
+                skip_err_rpt = true;
                 cd_frame_t *frame = cd_list_get(&frame_free_head);
                 if (frame) {
                     frame->dat[0] = bus_mac;
@@ -267,9 +261,17 @@ reply_err_code:
 static void udp_notify_task(void *arg)
 {
     cd_frame_t *frame;
+    list_head_t head_in = {0};
+    list_head_t head_left = {0};
 
     while (true) {
-        xQueueReceive(udp_notify_queue, &frame, portMAX_DELAY);
+        while (head_left.len) {
+            frame = cd_list_get(&head_left);
+            cd_list_put(&head_in, frame);
+        }
+        frame = cd_list_get(&head_in);
+        if (!frame)
+            xQueueReceive(udp_notify_queue, &frame, portMAX_DELAY);
         //ESP_LOGI(tag, "reply udp cmd (len %d): frame: %p\n", frame->dat[2], frame);
         if (udp_sock < 0) {
             cd_list_put(&frame_free_head, frame);
@@ -277,24 +279,50 @@ static void udp_notify_task(void *arg)
         }
 
         uint8_t shift = 0;
+        uint8_t mac = frame->dat[0];
         if (frame->w_hdr & 0x80) {
             if (frame->w_hdr & 0x40) {
                 shift += 2;
                 put_unaligned16(csa.k_cnt_tx_udp++, tx_buf + 4);
             }
             if (frame->w_hdr & 0x20) {
+                tx_buf[4 + shift] = frame->dat[0];
                 shift++;
-                tx_buf[6] = frame->dat[0];
             }
         }
         tx_buf[3] = frame->w_hdr;
         memcpy(tx_buf + 4 + shift, frame->dat + 3, frame->dat[2]);
         uint16_t len = frame->dat[2] + shift;
+        struct sockaddr_storage udp_addr = {0};
+        memcpy(&udp_addr, &frame->udp_addr, sizeof(frame->udp_addr));
+        cd_list_put(&frame_free_head, frame);
+
+        // if cdnet_len == 253 && has new frame without timeout && w_hdr and src_mac same
+        if (len - shift == 253) {
+            uint8_t pkt_num = 1;
+            while (true) {
+                frame = cd_list_get(&head_in);
+                if (!frame)
+                    xQueueReceive(udp_notify_queue, &frame, 10 / portTICK_PERIOD_MS);
+                if (!frame)
+                    break;
+                if (frame->w_hdr != tx_buf[3] || mac != frame->dat[0]) {
+                    cd_list_put(&head_left, frame);
+                    continue;
+                }
+                uint8_t l = frame->dat[2];
+                memcpy(tx_buf + 4 + len, frame->dat + 3, l);
+                len += l;
+                cd_list_put(&frame_free_head, frame);
+                pkt_num++;
+                if (l != 253 || pkt_num == 5)
+                    break;
+            }
+        }
 
         if ((tx_buf[3] & 0xc0) == 0xc0) {
             int e_len = aes256_cbc_encrypt(tx_buf + 4, len, tx_buf + 4);
             if (e_len < 16) {
-                cd_list_put(&frame_free_head, frame);
                 ESP_LOGE(tag, "encrypt err");
                 continue;
             }
@@ -306,11 +334,10 @@ static void udp_notify_task(void *arg)
             len++;
 
         if (udp_sock >= 0) {
-            int err = sendto(udp_sock, dat, len, 0, (struct sockaddr *)&frame->udp_addr, sizeof(frame->udp_addr));
+            int err = sendto(udp_sock, dat, len, 0, (struct sockaddr *)&udp_addr, sizeof(udp_addr));
             if (err < 0)
                 ESP_LOGE(tag, "udp sendto: errno %d", errno);
         }
-        cd_list_put(&frame_free_head, frame);
     }
 }
 

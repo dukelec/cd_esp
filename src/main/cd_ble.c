@@ -20,9 +20,10 @@ static uint8_t mfg_data[8] = {0xe5, 0x02};
 static bool notify_state;
 static uint8_t gatts_addr_type;
 uint16_t ble_conn_handle;
-static uint8_t tx_buf[4+3+253+16] __attribute__((aligned(4))) = {0};
-
 QueueHandle_t ble_notify_queue = NULL;
+
+#define TX_BUF_SIZE (4 + 3 + 253 * 16 + 16) // 4071
+static uint8_t tx_buf[TX_BUF_SIZE] __attribute__((aligned(4))) = {0};
 
 
 static int gatts_gap_event(struct ble_gap_event *event, void *arg);
@@ -83,9 +84,19 @@ static void notify_task(void *arg)
 {
     struct os_mbuf *om;
     cd_frame_t *frame;
+    list_head_t head_in = {0};
+    list_head_t head_left = {0};
+    uint8_t frag_cnt = 0;
 
     while (true) {
-        xQueueReceive(ble_notify_queue, &frame, portMAX_DELAY);
+        bool fragment = false;
+        while (head_left.len) {
+            frame = cd_list_get(&head_left);
+            cd_list_put(&head_in, frame);
+        }
+        frame = cd_list_get(&head_in);
+        if (!frame)
+            xQueueReceive(ble_notify_queue, &frame, portMAX_DELAY);
         //ESP_LOGI(tag, "reply ble cmd, frame: %p\n", frame);
         if (!notify_state) {
             cd_list_put(&frame_free_head, frame);
@@ -93,20 +104,45 @@ static void notify_task(void *arg)
         }
 
         uint8_t shift = 0;
+        uint8_t mac = frame->dat[0];
         if (frame->w_hdr & 0x80) {
             if (frame->w_hdr & 0x40) {
                 shift += 2;
                 put_unaligned16(csa.k_cnt_tx_ble++, tx_buf + 4);
             }
             if (frame->w_hdr & 0x20) {
+                tx_buf[4 + shift] = frame->dat[0];
                 shift++;
-                tx_buf[6] = frame->dat[0];
             }
         }
         tx_buf[3] = frame->w_hdr;
         memcpy(tx_buf + 4 + shift, frame->dat + 3, frame->dat[2]);
         uint16_t len = frame->dat[2] + shift;
         cd_list_put(&frame_free_head, frame);
+
+        // if cdnet_len == 253 && has new frame without timeout && w_hdr and src_mac same
+        if (len - shift == 253) {
+            uint8_t pkt_num = 1;
+            while (true) {
+                frame = cd_list_get(&head_in);
+                if (!frame)
+                    xQueueReceive(ble_notify_queue, &frame, 10 / portTICK_PERIOD_MS);
+                if (!frame)
+                    break;
+                if (frame->w_hdr != tx_buf[3] || mac != frame->dat[0]) {
+                    cd_list_put(&head_left, frame);
+                    continue;
+                }
+                fragment = true;
+                uint8_t l = frame->dat[2];
+                memcpy(tx_buf + 4 + len, frame->dat + 3, l);
+                len += l;
+                cd_list_put(&frame_free_head, frame);
+                pkt_num++;
+                if (l != 253 || pkt_num == 16)
+                    break;
+            }
+        }
 
         if ((tx_buf[3] & 0xc0) == 0xc0) {
             int e_len = aes256_cbc_encrypt(tx_buf + 4, len, tx_buf + 4);
@@ -117,23 +153,50 @@ static void notify_task(void *arg)
             len = e_len;
         }
 
-        uint8_t *dat = (tx_buf[3] & 0x80) ? tx_buf + 3 : tx_buf + 4;
-        if (tx_buf[3] & 0x80)
-            len++;
+        uint8_t *dat = tx_buf + 4;
+        bool big_mtu = true;
+        if (fragment && !(tx_buf[3] & 0x80) && len > 495)
+            tx_buf[3] = 0x80;
+        if ((tx_buf[3] & 0x80) && len != (495 - 1) * 8)
+            big_mtu = false;
 
-        do {
-            om = ble_hs_mbuf_from_flat(dat, len);
-            if (om == NULL) {
-                ESP_LOGE(tag, "no mbuf available from pool, retry..");
+        while (true) {
+            uint8_t *p = dat;
+            uint16_t limit = big_mtu ? 495 : 244;
+            if (tx_buf[3] & 0x80)
+                limit--;
+            uint16_t l = min(limit, len);
+            if (!l)
+                break;
+            dat += l;
+            len -= len;
+            if (tx_buf[3] & 0x80) {
+                p--;
+                l++;
+                *p = tx_buf[3] & 0b11100000;
+                if (p != tx_buf + 3 || len) {
+                    if (p == tx_buf + 3)
+                        *p |= (frag_cnt++ & 7) | 0x08;
+                    else if (len)
+                        *p |= (frag_cnt++ & 7) | 0x10;
+                    else
+                        *p |= (frag_cnt++ & 7) | 0x18;
+                }
+            }
+            do {
+                om = ble_hs_mbuf_from_flat(p, l);
+                if (om == NULL) {
+                    ESP_LOGE(tag, "no mbuf available from pool, retry..");
+                    vTaskDelay(100 / portTICK_PERIOD_MS);
+                }
+            } while (om == NULL);
+
+
+            int rc = ble_gatts_notify_custom(ble_conn_handle, ble_notify_handle, om);
+            if (rc != 0) {
+                ESP_LOGE(tag, "error while sending notification; rc = %d", rc);
                 vTaskDelay(100 / portTICK_PERIOD_MS);
             }
-        } while (om == NULL);
-
-
-        int rc = ble_gatts_notify_custom(ble_conn_handle, ble_notify_handle, om);
-        if (rc != 0) {
-            ESP_LOGE(tag, "error while sending notification; rc = %d", rc);
-            vTaskDelay(100 / portTICK_PERIOD_MS);
         }
     }
 }

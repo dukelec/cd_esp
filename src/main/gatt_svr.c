@@ -21,7 +21,7 @@
 #define THRPT_CHR_WRITE     0x0002
 #define THRPT_CHR_NOTIFY    0x0003
 
-#define RX_BUF_SIZE         3960 // 4+(495-1)×8=3956, 4+(244-1)×16=3892
+#define RX_BUF_SIZE (4 + 3 + 253 * 16 + 16) // 4071
 static uint8_t rx_buf[RX_BUF_SIZE] __attribute__((aligned(4))) = {0};
 static uint16_t rx_pos = 4;
 static uint8_t frag_cnt = 0;
@@ -86,9 +86,8 @@ static int gatt_svr_chr_write(uint16_t conn_handle, uint16_t attr_handle,
 static int gatt_svr_read_write_long_test(uint16_t conn_handle, uint16_t attr_handle,
         struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
-    static bool frag_cnt_err = false;   // avoid multiple frag err report
-    static bool aes_cnt_err = false;    // avoid multiple cnt err report
-    int rc;
+    static bool skip_err_rpt = false;
+    static bool frag_cnt_err = false;
     uint16_t uuid16 = extract_uuid16_from_thrpt_uuid128(ctxt->chr->uuid);
     assert(uuid16 != 0);
 
@@ -98,24 +97,24 @@ static int gatt_svr_read_write_long_test(uint16_t conn_handle, uint16_t attr_han
         uint16_t len = min(cur_free, OS_MBUF_PKTLEN(ctxt->om));
         uint8_t dat_bk = *cur_buf;
 
-        rc = gatt_svr_chr_write(conn_handle, attr_handle, ctxt->om, 0, cur_free, cur_buf, NULL);
+        int rc = gatt_svr_chr_write(conn_handle, attr_handle, ctxt->om, 0, cur_free, cur_buf, NULL);
         //ESP_LOGI(tag, "BLE_GATT_ACCESS_OP_WRITE_CHR, len: %d\n", len);
 
         uint8_t w_hdr;
         uint8_t tgt_mac;
         uint8_t *cdn_buf;
         uint16_t cdn_len;
-        uint8_t err_code = 0; // 1: frag err, 2: aes err, 3: intf busy
+        uint8_t err_code = 0; // 1: frag err, 2: aes err
 
         if (len < 2) {
-            err_code = 1;
-            goto reply_err_code;
+            rx_pos = 4;
+            return rc;
         }
 
         if ((*cur_buf & 0x80) == 0) { // no w_hdr
             if (rx_pos != 4) {
-                err_code = 1; // frag err
-                goto reply_err_code;
+                rx_pos = 4;
+                return rc;
             }
             w_hdr = 0;
             cdn_len = len;
@@ -125,8 +124,8 @@ static int gatt_svr_read_write_long_test(uint16_t conn_handle, uint16_t attr_han
 
         } else if ((*cur_buf & 0x18) == 0) { // no fragment
             if (rx_pos != 4) {
-                err_code = 1; // frag err
-                goto reply_err_code;
+                rx_pos = 4;
+                return rc;
             }
             w_hdr = rx_buf[3];
             cdn_len = len - 1;
@@ -138,17 +137,20 @@ static int gatt_svr_read_write_long_test(uint16_t conn_handle, uint16_t attr_han
 
         } else if ((*cur_buf & 0x18) == 0x08) { // first fragment
             if (rx_pos != 4) {
-                err_code = 1; // frag err
-                goto reply_err_code;
+                rx_pos = 4;
+                frag_cnt_err = true;
+                return rc;
             }
+            frag_cnt_err = false;
             rx_pos += len - 1;
             frag_cnt = *cur_buf & 7;
             return rc;
 
         } else if ((*cur_buf & 0x18) == 0x18) { // last fragment
             frag_cnt = (frag_cnt + 1) & 7;
-            if ((*cur_buf & 7) != frag_cnt) {
-                ESP_LOGE(tag, "ble rx frag_cnt err, cur: %02x != %02x, %d", *cur_buf, frag_cnt, frag_cnt_err);
+            if (frag_cnt_err || (*cur_buf & 7) != frag_cnt) {
+                ESP_LOGE(tag, "ble rx frag_cnt err, cur: %02x != %02x, %d %d",
+                        *cur_buf, frag_cnt, frag_cnt_err, skip_err_rpt);
                 err_code = 1; // frag err
                 goto reply_err_code;
             }
@@ -165,10 +167,10 @@ static int gatt_svr_read_write_long_test(uint16_t conn_handle, uint16_t attr_han
         } else { // more fragment
             rx_pos += len - 1;
             frag_cnt = (frag_cnt + 1) & 7;
-            if ((*cur_buf & 7) != frag_cnt) {
+            if (frag_cnt_err || (*cur_buf & 7) != frag_cnt) {
                 ESP_LOGE(tag, "ble rx frag_cnt err, cur: %02x != %02x, %d", *cur_buf, frag_cnt, frag_cnt_err);
-                err_code = 1; // frag err
-                goto reply_err_code;
+                frag_cnt_err = true;
+                return rc;
             }
             *cur_buf = dat_bk;
             return rc;
@@ -177,9 +179,9 @@ static int gatt_svr_read_write_long_test(uint16_t conn_handle, uint16_t attr_han
 decrypt:
         int plain_len = aes256_cbc_decrypt(cdn_buf, cdn_len, cdn_buf);
         if (plain_len < 4 || get_unaligned16(cdn_buf) != csa.k_cnt_rx_ble) {
-            err_code = 2; // aes err
             ESP_LOGE(tag, "plain_len: %d, rx_cnt: %04x != %04x, %d",
-                    plain_len, get_unaligned16(cdn_buf), csa.k_cnt_rx_ble, aes_cnt_err);
+                    plain_len, get_unaligned16(cdn_buf), csa.k_cnt_rx_ble, skip_err_rpt);
+            err_code = 2; // aes err
             goto reply_err_code;
         }
         csa.k_cnt_rx_ble++;
@@ -196,8 +198,7 @@ parse_w_hdr:
         }
 
 cdn_to_frame:
-        frag_cnt_err = false;
-        aes_cnt_err = false;
+        skip_err_rpt = false;
         uint8_t *sub_buf = cdn_buf;
         while (sub_buf < cdn_buf + cdn_len) {
             int sub_len = min(253, cdn_len - (sub_buf - cdn_buf));
@@ -222,15 +223,9 @@ cdn_to_frame:
 
 reply_err_code:
         rx_pos = 4;
-        if (err_code == 1) {
-            if (frag_cnt_err)
-                return rc;
-            frag_cnt_err = true;
-        } else if (err_code == 2) {
-            if (aes_cnt_err)
-                return rc;
-            aes_cnt_err = true;
-        }
+        if (skip_err_rpt)
+            return rc;
+        skip_err_rpt = true;
         cd_frame_t *frame = cd_list_get(&frame_free_head);
         if (frame) {
             frame->dat[0] = bus_mac;
