@@ -219,7 +219,7 @@ static int gatts_gap_event(struct ble_gap_event *event, void *arg)
         } else {
             csa.ble_connect = true;
             csa.t_ble_connect = get_systick();
-            csa.k_st_ble = !csa.k_en_ble;
+            csa.k_st_ble = !(csa.k_en & 1);
         }
 
         ble_conn_handle = event->connect.conn_handle;

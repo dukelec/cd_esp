@@ -125,8 +125,7 @@ static void udp_server_task(void *arg)
 
         while (true) {
             //ESP_LOGI(tag, "waiting for data");
-            uint8_t *cur_buf = rx_buf + 3;
-            int len = recvfrom(udp_sock, cur_buf, sizeof(rx_buf)-3, 0, (struct sockaddr *)&source_addr, &socklen);
+            int len = recvfrom(udp_sock, rx_buf + 3, sizeof(rx_buf) - 3, 0, (struct sockaddr *)&source_addr, &socklen);
             if (len < 0) {
                 ESP_LOGE(tag, "recvfrom failed: errno %d", errno);
                 break;
@@ -156,17 +155,17 @@ static void udp_server_task(void *arg)
                 if (len < 2)
                     continue;
 
-                if ((*cur_buf & 0x80) == 0) { // no w_hdr
+                if ((rx_buf[3] & 0x80) == 0) { // no w_hdr
                     w_hdr = 0;
                     cdn_len = len;
-                    cdn_buf = cur_buf;
+                    cdn_buf = rx_buf + 3;
                     tgt_mac = (cdn_buf[0] & 0b11100000) == 0b01100000 ? csa.p_mac : bus_mac;
                     goto cdn_to_frame;
 
-                } else if ((*cur_buf & 0x18) == 0) { // w_hdr, no fragment
+                } else if ((rx_buf[3] & 0x18) == 0) { // w_hdr, no fragment
                     w_hdr = rx_buf[3];
                     cdn_len = len - 1;
-                    cdn_buf = cur_buf + 1;
+                    cdn_buf = rx_buf + 4;
                     if ((rx_buf[3] & 0x40) == 0) // else decrypt
                         goto parse_w_hdr;
 
@@ -185,15 +184,17 @@ static void udp_server_task(void *arg)
                 cdn_len = plain_len - 2;
                 cdn_buf = rx_buf + 6; // tgt_mac or cdn_payload
 
-                if (get_unaligned16(csa.remote_ip) == 0xffff || csa.remote_port == 0xffff) {
-                    memcpy(csa.remote_ip, src_ip, 16);
-                    csa.remote_port = src_port;
-                    udp_src_addr_valid = true;
-                    memcpy(&udp_src_addr, &source_addr, sizeof(source_addr));
-                    ESP_LOGI(tag, "update csa remote_ip/port");
+parse_w_hdr:
+                if ((rx_buf[3] & 0x40) || !(csa.k_en & 2)) {
+                    if (get_unaligned16(csa.remote_ip) == 0xffff || csa.remote_port == 0xffff) {
+                        memcpy(csa.remote_ip, src_ip, 16);
+                        csa.remote_port = src_port;
+                        udp_src_addr_valid = true;
+                        memcpy(&udp_src_addr, &source_addr, sizeof(source_addr));
+                        ESP_LOGI(tag, "update csa remote_ip/port");
+                    }
                 }
 
-parse_w_hdr:
                 if ((rx_buf[3] & 0x20) != 0) { // mac_flag
                     tgt_mac = *cdn_buf++;
                     cdn_len--;

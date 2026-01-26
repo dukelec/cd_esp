@@ -216,7 +216,7 @@ static inline void serial_cmd_dispatch(void)
             if (proxy_cmd || proxy_ret) {
                 frame->dat[1] = 0;
                 if (csa.proxy_sel == INTF_UDP) {
-                    frame->w_hdr = 0xc0;
+                    frame->w_hdr = (csa.k_en & 2) ? 0xc0 : 0;
                     if (frame->dat[0] != csa.p_mac)
                         frame->w_hdr |= 0xa0;
                     if (udp_src_addr_valid) {
@@ -225,7 +225,7 @@ static inline void serial_cmd_dispatch(void)
                         ret = xQueueSend(udp_notify_queue, (void *) &frame, (TickType_t) 0);
                     }
                 } else { // ble
-                    frame->w_hdr = csa.k_en_ble ? 0xc0 : 0;
+                    frame->w_hdr = (csa.k_en & 1) ? 0xc0 : 0;
                     if (frame->dat[0] != csa.p_mac)
                         frame->w_hdr |= 0xa0;
                     //ESP_LOGI(tag, "forward: rs485 -> ble central, frame: %p\n", frame);
@@ -261,7 +261,8 @@ static inline void serial_cmd_dispatch(void)
         uint8_t server_num = frame->dat[4];
         uint8_t *p_dat = frame->dat + 5;
 
-        if (!(frame->w_hdr & 0x40) && ((frame->intf == INTF_BLE && csa.k_en_ble) || frame->intf == INTF_UDP)) {
+        if (!(frame->w_hdr & 0x40) && ((frame->intf == INTF_BLE && (csa.k_en & 1))
+                || (frame->intf == INTF_UDP && (csa.k_en & 2)))) {
             bool is_err = true;
             uint8_t subs = p_dat[0];
 

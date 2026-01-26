@@ -17,7 +17,7 @@
 #include "modbus_crc.h"
 
 #define APP_CONF_ADDR       0x003ff000 // last page
-#define APP_CONF_VER        0x0200
+#define APP_CONF_VER        0x0201
 
 #define FRAME_MAX           40
 
@@ -50,7 +50,7 @@ typedef struct {
     uint8_t         p_mac;          // predefined remote rs485 address
 
     uint8_t         _reserved2[12];
-    bool            k_en_ble;
+    uint8_t         k_en;           // bit0: ble, bit1: udp
     uint8_t         k_pwd[24];
 
     uint8_t         ble_itvl_min;   // units 1.25ms
@@ -62,7 +62,7 @@ typedef struct {
     // end of flash
     // below read only without key auth
     #define         _end_save proxy_sel
-    uint8_t         proxy_sel;      // 0: empty, 1: ble, 2: wifi
+    uint8_t         proxy_sel;      // 0: empty, 1: ble, 2: udp
     bool            ble_stop;
 
     uint8_t         _reserved4[13];

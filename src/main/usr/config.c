@@ -17,6 +17,7 @@ const csa_t csa_dft = {
         .conf_ver = APP_CONF_VER,
         .bus_cfg = CDCTL_CFG_DFT(0xfe),
         .p_mac = 0x10,
+        .k_en = 2,
         .k_pwd = "123456",
         .ble_itvl_min = 6,
         .ble_itvl_max = 12,
@@ -139,7 +140,7 @@ void csa_list_show(void)
     CSA_SHOW(1, magic_code, "Magic code: 0xcdcd");
     CSA_SHOW(1, conf_ver, "Config version");
     CSA_SHOW(1, conf_from, "0: default config, 1: all from flash, 2: partly from flash");
-    CSA_SHOW(0, do_reboot, "Write 1 to reboot");
+    CSA_SHOW(0, do_reboot, "Write 2 to reboot");
     CSA_SHOW(0, save_conf, "Write 1 to save current config to flash");
     d_debug("\n");
 
@@ -157,7 +158,7 @@ void csa_list_show(void)
     d_debug("\n");
 
     CSA_SHOW(1, p_mac, "Predefined remote rs485 address");
-    CSA_SHOW(0, k_en_ble, "Key enable");
+    CSA_SHOW(0, k_en, "Key enable (bit0: ble, bit1: udp)");
     CSA_SHOW(0, k_pwd, "Key string");
     d_debug("\n");
 

@@ -150,8 +150,8 @@ When a packet requires encryption:
  - Also read `k_cnt_rx_ble/udp` (defaults to 0 at startup). Upon receiving an encrypted packet, CD-ESP checks this counter;  
    If it doesn’t match, an error is reported. Otherwise, the counter increments automatically.
  - For encrypted packets, only the 1-byte WHDR remains unencrypted; everything after WHDR is encrypted with AES256-CBC using PKCS#7 padding.
- - When encryption is required (`k_en_ble` = 1 for BLE; Wi-Fi always requires encryption), registers from `proxy_sel` onward can still be read in plaintext.
- - For BLE with `k_en_ble` = 1, the first encrypted communication must complete within 8 seconds of connecting to CD-ESP, or the connection is terminated.
+ - When encryption is enabled (`k_en` bit0 for BLE; bit1 for Wi-Fi), registers starting from `proxy_sel` can still be read in plaintext.
+ - For BLE, when encryption is enabled, the first encrypted transaction must complete within 8 seconds after connection, or the link is terminated.
 
 
 #### BLE Fragment Example:
@@ -205,13 +205,13 @@ Address: 0x0007; Type: uint8_t
 Description: Write 1 to save parameters to flash; settings persist after reboot
 
 
-#### k_en_ble
+#### k_en
 
 Address: 0x0092; Type: uint8_t
 
-Values:
- - 0: Disable password protection (default)
- - 1: Enable password protection
+Bits:
+ - bit0: Enable BLE password protection when set
+ - bit1: Enable UDP password protection when set
 
 Note: This protocol does not use the built-in Bluetooth pairing or encryption; it relies on custom AES256 encryption.
 
@@ -304,15 +304,18 @@ Bits:
  - remote_ip: 16-byte uint8_t[] array (raw IP data, not string)
  - remote_port: uint16_t port number
 
-Default: remote_ip = ff...ff, first two bytes ff indicate invalid IP; remote_port = 0xFFFF indicates invalid port.
+Default: remote_ip = ff...ff, first two bytes ff indicate invalid ip; remote_port = 0xFFFF indicates invalid port.
 
 Behavior:
- - If remote_ip or remote_port is invalid, after one successful AES-encrypted communication, they are automatically updated to the client’s IP and port.
- - Proxy responses are sent to this updated remote_ip/port.
- - Clients can check if remote_ip/port is invalid:
-   * If invalid, CD-ESP is idle and ready for an encrypted connection.
-   * After communication, a client can reset remote_ip/port to invalid to allow other clients to connect.
-   * If waiting indefinitely for invalid values and the plaintext k_cnt_rx_udp register does not change, the previous client likely disconnected; encrypted communication can be used to reset remote_ip/port.
+ - If remote_ip or remote_port is invalid:
+   * When encryption is enabled, they are updated to the client’s IP and port after one encrypted communication.
+   * When encryption is disabled, they are updated after one plaintext UDP communication.
+ - Proxy responses are sent to the updated remote_ip/port.
+ - Clients should check remote_ip/port before communication:
+   * If invalid, or equal to the client’s own ip and port, CD-ESP is idle and ready to communicate.
+   * After communication, the client can reset remote_ip/port to invalid to allow other clients to connect.
+   * If remote_ip/port remain occupied by another client and the plaintext k_cnt_rx_udp register does not change for an extended period,
+     it is reasonable to assume the connection has been terminated; in this case, remote_ip/port can be forcibly updated.
 
 
 #### local_ip
@@ -336,7 +339,7 @@ Results of Wi-Fi scanning
 ## Build Instructions
 
 Based on IDF v6.0-beta1, run `source esp-idf/export.sh`, then execute `src/idf_patchs/patch_all.sh` once.  
-After that, enter the `src` directory and run `idf.py build`.
+After that, enter the `src` directory, run `idf.py set-target esp32c3` (only required the first time), and then execute `idf.py build`.
 
 Firmware can be upgraded by:
  - Using the CDBUS GUI tool to perform RS-485 IAP with the HEX file in the build directory.
