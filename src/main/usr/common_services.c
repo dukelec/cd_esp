@@ -213,6 +213,8 @@ static inline void serial_cmd_dispatch(void)
             frame->intf = INTF_485;
             bool proxy_cmd = (frame->dat[3] & 0b11100000) == 0b01100000; // report / cmd
             bool proxy_ret = (frame->dat[4] & 0b11100000) == 0b01100000; // reply
+            if (frame->dat[3] >= 0x40 && frame->dat[4] > 8) // report port > 8
+                proxy_cmd = true;
             if (proxy_cmd || proxy_ret) {
                 frame->dat[1] = 0;
                 if (csa.proxy_sel == INTF_UDP) {

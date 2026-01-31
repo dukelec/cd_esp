@@ -96,6 +96,7 @@ Recommendations:
 
  - When bit5 of the CDNET temporary port is 0, the communication target is the CD-ESP itself.
  - When bit5 is 1, the packet is forwarded to the other end via the CD-ESP proxy.
+ - Command/report packets from RS485 are proxied by default when the target port is greater than 8.
 
 When proxying is enabled:
  - If the target is the RS-485 node specified by the `p_mac` register, the T-MAC field is not included.

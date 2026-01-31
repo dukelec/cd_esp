@@ -126,7 +126,7 @@ static void notify_task(void *arg)
             while (true) {
                 frame = cd_list_get(&head_in);
                 if (!frame)
-                    xQueueReceive(ble_notify_queue, &frame, 10 / portTICK_PERIOD_MS);
+                    xQueueReceive(ble_notify_queue, &frame, 50 / portTICK_PERIOD_MS);
                 if (!frame)
                     break;
                 if (frame->w_hdr != tx_buf[3] || mac != frame->dat[0]) {
@@ -154,11 +154,9 @@ static void notify_task(void *arg)
         }
 
         uint8_t *dat = tx_buf + 4;
-        bool big_mtu = true;
+        bool big_mtu = csa.ble_mtu_cur >= 498;
         if (fragment && !(tx_buf[3] & 0x80) && len > 495)
             tx_buf[3] = 0x80;
-        if ((tx_buf[3] & 0x80) && len != (495 - 1) * 8)
-            big_mtu = false;
 
         while (true) {
             uint8_t *p = dat;
@@ -169,7 +167,7 @@ static void notify_task(void *arg)
             if (!l)
                 break;
             dat += l;
-            len -= len;
+            len -= l;
             if (tx_buf[3] & 0x80) {
                 p--;
                 l++;

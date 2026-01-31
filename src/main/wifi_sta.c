@@ -304,7 +304,7 @@ static void udp_notify_task(void *arg)
             while (true) {
                 frame = cd_list_get(&head_in);
                 if (!frame)
-                    xQueueReceive(udp_notify_queue, &frame, 10 / portTICK_PERIOD_MS);
+                    xQueueReceive(udp_notify_queue, &frame, 50 / portTICK_PERIOD_MS);
                 if (!frame)
                     break;
                 if (frame->w_hdr != tx_buf[3] || mac != frame->dat[0]) {
