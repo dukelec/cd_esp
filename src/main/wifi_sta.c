@@ -159,33 +159,29 @@ static void udp_server_task(void *arg)
                     w_hdr = 0;
                     cdn_len = len;
                     cdn_buf = rx_buf + 3;
-                    tgt_mac = (cdn_buf[0] & 0b11100000) == 0b01100000 ? csa.p_mac : bus_mac;
-                    goto cdn_to_frame;
 
                 } else if ((rx_buf[3] & 0x18) == 0) { // w_hdr, no fragment
                     w_hdr = rx_buf[3];
                     cdn_len = len - 1;
                     cdn_buf = rx_buf + 4;
-                    if ((rx_buf[3] & 0x40) == 0) // else decrypt
-                        goto parse_w_hdr;
+                    if (w_hdr & 0x40) {
+                        int plain_len = aes256_cbc_decrypt(cdn_buf, cdn_len, cdn_buf);
+                        if (plain_len < 4 || get_unaligned16(cdn_buf) != csa.k_cnt_rx_udp) {
+                            ESP_LOGE(tag, "plain_len: %d, rx_cnt: %04x != %04x, %d",
+                                    plain_len, get_unaligned16(cdn_buf), csa.k_cnt_rx_udp, skip_err_rpt);
+                            err_code = 2; // aes err
+                            goto reply_err_code;
+                        }
+                        csa.k_cnt_rx_udp++;
+                        cdn_len = plain_len - 2;
+                        cdn_buf = rx_buf + 6; // tgt_mac or cdn_payload
+                    }
 
                 } else {
                     continue;
                 }
 
-                int plain_len = aes256_cbc_decrypt(cdn_buf, cdn_len, cdn_buf);
-                if (plain_len < 4 || get_unaligned16(cdn_buf) != csa.k_cnt_rx_udp) {
-                    ESP_LOGE(tag, "plain_len: %d, rx_cnt: %04x != %04x, %d",
-                            plain_len, get_unaligned16(cdn_buf), csa.k_cnt_rx_udp, skip_err_rpt);
-                    err_code = 2; // aes err
-                    goto reply_err_code;
-                }
-                csa.k_cnt_rx_udp++;
-                cdn_len = plain_len - 2;
-                cdn_buf = rx_buf + 6; // tgt_mac or cdn_payload
-
-parse_w_hdr:
-                if ((rx_buf[3] & 0x40) || !(csa.k_en & 2)) {
+                if ((w_hdr & 0x40) || !(csa.k_en & 2)) {
                     if (get_unaligned16(csa.remote_ip) == 0xffff || csa.remote_port == 0xffff) {
                         memcpy(csa.remote_ip, src_ip, 16);
                         csa.remote_port = src_port;
@@ -195,14 +191,13 @@ parse_w_hdr:
                     }
                 }
 
-                if ((rx_buf[3] & 0x20) != 0) { // mac_flag
+                if ((w_hdr & 0x20) != 0) { // mac_flag
                     tgt_mac = *cdn_buf++;
                     cdn_len--;
                 } else {
                     tgt_mac = (cdn_buf[0] & 0b11100000) == 0b01100000 ? csa.p_mac : bus_mac;
                 }
 
-cdn_to_frame:
                 skip_err_rpt = false;
                 uint8_t *sub_buf = cdn_buf;
                 while (sub_buf < cdn_buf + cdn_len) {
