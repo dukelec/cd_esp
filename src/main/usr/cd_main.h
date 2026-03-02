@@ -116,8 +116,8 @@ extern list_head_t ble_rx_head;
 extern list_head_t udp_rx_head;
 
 int sent_cmd(uint8_t dst_mac, uint8_t *d, uint8_t d_len, bool reply, cd_frame_t **rfrm);
-void common_service_init(void);
-void common_service_routine(void);
+void comm_service_init(void);
+void comm_service_poll(void);
 
 void cd_main_early(void);
 void cd_main_late(void);

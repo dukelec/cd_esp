@@ -12,7 +12,7 @@ idf_component_register(
         "utils/modbus_crc.c"
         "usr/cd_main.c"
         "usr/cdctl_spi_wr.c"
-        "usr/common_services.c"
+        "usr/comm_service.c"
         "usr/config.c"
 
     INCLUDE_DIRS
