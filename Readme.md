@@ -22,6 +22,7 @@ The payload is encoded using the CDNET protocol. For detailed information, pleas
  - https://github.com/dukelec/cdnet
  - https://github.com/dukelec/cdnet/wiki/CDNET-Intro-and-Demo
 
+
 ### BLE
 
 #### Advertising:
@@ -107,9 +108,9 @@ When proxying is enabled:
 
 | FIELD   | DESCRIPTION                                 |
 |-------- |---------------------------------------------|
-| [7]     | Always 1 (indicates this byte is a WHDR)    |
-| [6]     | a_cnt_en                        |
-| [5]     | t_mac_en                        |
+| [7]     | Always 1 (indicates WHDR byte)              |
+| [6]     | a_cnt_en                                    |
+| [5]     | t_mac_en                                    |
 | [4:3]   | frag_type (00: no fragment, 01: first, 10: continue, 11: last) |
 | [2:0]   | frag_cnt (frag_type ≠ 0) or err_code (frag_type = 0)           |
 
@@ -164,7 +165,7 @@ Example 1:
  - AES256 block size: 16 bytes → 3952 ÷ 16 = 247 blocks, fits exactly, no wasted bandwidth.
  - Due to PKCS#7 padding, the plaintext part is 1 byte smaller (if plaintext is a multiple of 16 bytes, padding adds 16 bytes).
  - With 2 bytes of A-CNT at the start, the plaintext size available for cdnet_pkt is:
-   3952 - 1(WHDR) - 2(A-CNT) = 3949 bytes (If T-MAC is enabled, subtract 1 more byte.)
+   3952 - 1(pad) - 2(A-CNT) = 3949 bytes (If T-MAC is enabled, subtract 1 more byte.)
  - Each cdnet_pkt is up to 253 bytes: 3949 ÷ 253 = 15 × 253 + 154
  - Result: 15 full 253-byte packets + 1 final 154-byte packet → 16 cdnet_pkt in total.
 
@@ -176,75 +177,198 @@ Example 2:
 
 ## Parameter Table
 
-Parameter list:
+Parameter table (read/write via CDNET port #05; `F`: retained after power-off, `!`: takes effect after reboot):
 
-<img src="doc/reg_list.avif" alt="Your browser may not support avif images!">
+<table>
+<tr> <th>Addr</th>   <th>Name</th>              <th>Attr</th>   <th>Type</th>   <th>Default</th>
+     <th>Description</th>
+</tr>
+<tr> <td>0x0000</td> <td>magic_code</td>        <td>R/W</td>    <td>u16</td>    <td>0xcdcd</td>
+     <td>Fixed value to check if flash contains a valid register table</td>
+</tr>
+<tr> <td>0x0002</td> <td>conf_ver</td>          <td>R/W</td>    <td>u16</td>    <td>0x0201</td>
+     <td>Register table version: high byte: major, low byte: minor</td>
+</tr>
+<tr> <td>0x0004</td> <td>conf_from</td>         <td>R</td>      <td>u8</td>     <td>0</td>
+     <td>
+        0: Default<br>
+        1: Flash-stored table<br>
+        2: Default from p_mac onwards (major version match only)
+     </td>
+</tr>
+<tr> <td>0x0005</td> <td>do_reboot</td>         <td>R/W</td>    <td>u8</td>     <td>0</td>
+     <td>Write 2: Normal reboot</td>
+</tr>
+<tr> <td>0x0007</td> <td>save_conf</td>         <td>R/W</td>    <td>u8</td>     <td>0</td>
+     <td>Write 1: Save config to flash</td>
+</tr>
+<tr> <td>0x0008</td> <td>dbg_en</td>            <td>R/W/F</td>  <td>u8</td>     <td>0</td>
+     <td>
+        0: No debug print<br>
+        1: Report debug print
+     </td>
+</tr>
+<tr> <td>0x000c</td> <td>bus_mac</td>           <td>R/W/F!</td> <td>u8</td>     <td>0xfe</td>
+     <td>Default serial address</td>
+</tr>
+<tr> <td>0x0010</td> <td>bus_baud_l</td>        <td>R/W/F!</td> <td>u32</td>    <td>115200</td>
+     <td>First byte default speed</td>
+</tr>
+<tr> <td>0x0014</td> <td>bus_baud_h</td>        <td>R/W/F!</td> <td>u32</td>    <td>115200</td>
+     <td>Following bytes default speed</td>
+</tr>
+<tr> <td>0x0018</td> <td>bus_filter_m</td>      <td>R/W/F!</td> <td>u8[2]</td>  <td>0xff 0xff</td>
+     <td>Multicast address filter</td>
+</tr>
+<tr> <td>0x001a</td> <td>bus_mode</td>          <td>R/W/F!</td> <td>u8</td>     <td>1</td>
+     <td>
+        0: Traditional half-duplex mode<br>
+        1: Arbitration mode<br>
+        2: BS mode
+     </td>
+</tr>
+<tr> <td>0x001c</td> <td>bus_tx_permit_len</td> <td>R/W/F!</td> <td>u16</td>    <td>20</td>
+     <td>
+        Waiting time to allows sending (10 bits)<br>
+        (Time unit: 1 bit duration)
+     </td>
+</tr>
+<tr> <td>0x001e</td> <td>bus_max_idle_len</td>  <td>R/W/F!</td> <td>u16</td>    <td>200</td>
+     <td>Max idle waiting time in BS mode (10 bits)</td>
+</tr>
+<tr> <td>0x0020</td> <td>bus_tx_pre_len</td>    <td>R/W/F!</td> <td>u8</td>     <td>1</td>
+     <td>
+        Enable TX_EN duration before TX output (2 bits)<br>
+        (Ignored in Arbitration mode)
+     </td>
+</tr>
+<tr> <td>0x0080</td> <td>p_mac</td>             <td>R/W/F</td>  <td>u8</td>     <td>0x10</td>
+     <td>Predefined target MAC</td>
+</tr>
+<tr> <td>0x008d</td> <td>k_en</td>              <td>R/W/F</td>  <td>u8</td>     <td>0x02</td>
+     <td>
+        - bit0: 1 = Enable BLE encryption<br>
+        - bit1: 1 = Enable UDP encryption
+     </td>
+</tr>
+<tr> <td>0x008e</td> <td>k_pwd</td>             <td>R/W/F!</td> <td>c8[24]</td> <td>"123456"</td>
+     <td>Password string</td>
+</tr>
+<tr> <td>0x00a6</td> <td>ble_itvl_min</td>      <td>R/W/F</td>  <td>u8</td>     <td>6</td>
+     <td>BLE connection interval min</td>
+</tr>
+<tr> <td>0x00a7</td> <td>ble_itvl_max</td>      <td>R/W/F</td>  <td>u8</td>     <td>12</td>
+     <td>BLE connection interval max</td>
+</tr>
+<tr> <td>0x00a8</td> <td>wifi_ssid</td>         <td>R/W/F</td>  <td>c8[32]</td> <td>""</td>
+     <td>Target Wi-Fi SSID</td>
+</tr>
+<tr> <td>0x00c8</td> <td>wifi_pwd</td>          <td>R/W/F</td>  <td>c8[64]</td> <td>""</td>
+     <td>Target Wi-Fi password</td>
+</tr>
+<tr> <td>0x0108</td> <td>wifi_conf</td>         <td>R/W/F</td>  <td>u8</td>     <td>0</td>
+     <td>
+        0: Disconnect (improves BLE speed)<br>
+        1: Station mode
+     </td>
+</tr>
+<tr> <td>0x0109</td> <td>proxy_sel</td>         <td>R/W</td>    <td>u8</td>     <td>1</td>
+     <td>1: BLE, 2: UDP</td>
+</tr>
+<tr> <td>0x010a</td> <td>ble_stop</td>          <td>R/W</td>    <td>u8</td>     <td>0</td>
+     <td>1: Stop BLE advertising (improves Wi-Fi speed)</td>
+</tr>
+<tr> <td>0x0118</td> <td>k_st_ble</td>          <td>R</td>      <td>u8</td>     <td>0</td>
+     <td>1: Password verified (always 1 if BLE encryption disabled)</td>
+</tr>
+<tr> <td>0x011c</td> <td>k_random</td>          <td>R</td>      <td>u32</td>    <td>--</td>
+     <td>Used by AES-256 encryption</td>
+</tr>
+<tr> <td>0x0120</td> <td>k_cnt_rx_ble</td>      <td>R</td>      <td>u16</td>    <td>0</td>
+     <td>Counter for BLE RX encryption</td>
+</tr>
+<tr> <td>0x0122</td> <td>k_cnt_tx_ble</td>      <td>R</td>      <td>u16</td>    <td>0</td>
+     <td>Counter for BLE TX encryption</td>
+</tr>
+<tr> <td>0x0124</td> <td>k_cnt_rx_udp</td>      <td>R</td>      <td>u16</td>    <td>0</td>
+     <td>Counter for UDP RX encryption</td>
+</tr>
+<tr> <td>0x0126</td> <td>k_cnt_tx_udp</td>      <td>R</td>      <td>u16</td>    <td>0</td>
+     <td>Counter for UDP TX encryption</td>
+</tr>
+<tr> <td>0x0132</td> <td>ble_mtu_cur</td>       <td>R</td>      <td>u16</td>    <td>--</td>
+     <td>BLE current connection MTU</td>
+</tr>
+<tr> <td>0x0134</td> <td>ble_itvl_cur</td>      <td>R</td>      <td>u8</td>     <td>--</td>
+     <td>BLE current connection interval</td>
+</tr>
+<tr> <td>0x0148</td> <td>wifi_state</td>        <td>R</td>      <td>u8</td>     <td>0</td>
+     <td>
+        - bit0 = 1: Scanning Wi-Fi<br>
+        - bit1 = 1: Wi-Fi connected<br>
+        - bit4 = 1: Attempting Wi-Fi connection
+     </td>
+</tr>
+<tr> <td>0x0149</td> <td>remote_ip</td>         <td>R/W</td>    <td>u8[16]</td>  <td>ff...ff</td>
+     <td>
+        UDP client IP (starts with ffff = invalid)<br>
+        Raw IP data (not string)
+     </td>
+</tr>
+<tr> <td>0x015a</td> <td>remote_port</td>       <td>R/W</td>    <td>u16</td>     <td>0xffff</td>
+     <td>UDP client port (0xffff = invalid)</td>
+</tr>
+<tr> <td>0x015c</td> <td>local_ip0</td>         <td>R</td>      <td>u8[16]</td>  <td>ff...ff</td>
+     <td>IPv4 address</td>
+</tr>
+<tr> <td>0x016c</td> <td>local_ip1</td>         <td>R</td>      <td>u8[16]</td>  <td>ff...ff</td>
+     <td>IPv6 link-local</td>
+</tr>
+<tr> <td>0x017c</td> <td>local_ip2</td>         <td>R</td>      <td>u8[16]</td>  <td>ff...ff</td>
+     <td>IPv6 global / other</td>
+</tr>
+<tr> <td>0x018c</td> <td>local_ip3</td>         <td>R</td>      <td>u8[16]</td>  <td>ff...ff</td>
+     <td>IPv6 global / other</td>
+</tr>
+<tr> <td>0x019c</td> <td>scan_start</td>        <td>R/W</td>    <td>u8</td>      <td>0</td>
+     <td>1: Start WiFi scanning</td>
+</tr>
+<tr> <td>0x019d</td> <td>scan_auth</td>         <td>R</td>      <td>u8[20]</td>  <td>00...00</td>
+     <td>
+        Scan result auth mode:<br>
+        1: Open<br>
+        2: WEP<br>
+        3: WPA_PSK<br>
+        4: WPA2_PSK<br>
+        5: WPA_WPA2_PSK<br>
+        ...
+     </td>
+</tr>
+<tr> <td>0x01b1</td> <td>scan_rssi</td>         <td>R</td>      <td>i8[20]</td>  <td>7f...7f</td>
+     <td>Scan result RSSI</td>
+</tr>
+<tr> <td>0x01c5</td> <td>scan_ssid0</td>        <td>R</td>      <td>c8[32]</td>  <td>""</td>
+     <td>Scan result SSID</td>
+</tr>
+<tr> <td>0x01e5</td> <td>scan_ssid1</td>        <td>R</td>      <td>c8[32]</td>  <td>""</td>
+     <td>Scan result SSID</td>
+</tr>
+<tr> <td>...</td>    <td>...</td>               <td>...</td>    <td>...</td>     <td>...</td>
+     <td>...</td>
+</tr>
+<tr> <td>0x0425</td> <td>scan_ssid19</td>       <td>R</td>      <td>c8[32]</td>  <td>""</td>
+     <td>Scan result SSID</td>
+</tr>
+</table>
 
-Note:
- - Parameters starting from ble_stop are not saved to flash.
- - Parameter table version: 0x0200
 
 
-#### conf_ver
+#### BLE connection interval suggestion
 
-Address: 0x0002; Type: uint16_t
-
-Description: Parameter table version information
-
-
-#### do_reboot
-
-Address: 0x0005; Type: uint8_t
-
-Description: Write 2 to reboot the device
-
-
-#### save_conf
-
-Address: 0x0007; Type: uint8_t
-
-Description: Write 1 to save parameters to flash; settings persist after reboot
-
-
-#### k_en
-
-Address: 0x0092; Type: uint8_t
-
-Bits:
- - bit0: Enable BLE password protection when set
- - bit1: Enable UDP password protection when set
-
-Note: This protocol does not use the built-in Bluetooth pairing or encryption; it relies on custom AES256 encryption.
-
-
-#### k_pwd
-
-Address: 0x0094; Type: char[24]
-
-Description:  
-Stores the password string, default "123456".  
-Modify this register to change the password.
-
-
-#### k_st_ble
-
-Address: 0x0118; Type: uint8_t
-
-Values:
- - 0: Password not verified
- - 1: Password verified (always 1 if password protection is disabled)
-
-
-#### ble_itvl_min/max
-
-Address: 0x00A6 / 0x00A7; Type: uint8_t
-
-Description:
-
-BLE connection parameters (connection interval).
+BLE connection interval range:
  - Default: 6–12
- - Android: Larger intervals improve file transfer speed (recommended 6–36)
- - iOS: Smaller intervals improve file transfer speed (recommended 6–12)
+ - Android: Larger intervals allow higher throughput (recommended 6–36)
+ - iOS: Smaller intervals allow higher throughput (recommended 6–12)
 
 Rules: Transmission window ≤ connection interval
 
@@ -252,65 +376,15 @@ Explanation:
  - On Android, longer intervals allow larger transmission windows, letting more data packets be sent per interval, improving throughput.
  - On iOS, the transmission window is fixed and small; reducing the connection interval allows more windows per unit time, compensating for the small window size.
 
-Effect: Changes take effect without reconnection. Saving to flash sets the values as defaults for subsequent power-ups.
+Effect: Changes take effect without reconnection.
 
 
-#### ble_stop
 
-Address: 0x010A; Type: uint8_t
+#### Remote IP / Port
 
-Values:
- - 1: Stop BLE advertising (improves Wi-Fi transmission speed when BLE is not connected)
- - 0: Resume BLE advertising
-
-
-#### proxy_sel
-
-Address: 0x0109; Type: uint8_t
-
-Select the current proxy interface:
- - 1: BLE (default)
- - 2: Wi-Fi
-
-
-#### wifi_ssid/pwd
-
-Target Wi-Fi network information.  
-Maximum length: SSID 32 bytes, Password 64 bytes.
-
-
-#### wifi_conf
-
-Address: 0x0108; Type: uint8_t
-
-Values:
- - 0: Disconnect Wi-Fi (BLE transmission speed improves when Wi-Fi is disconnected)
- - 1: Connect to the specified Wi-Fi SSID in station mode
-
-
-#### wifi_state
-
-Address: 0x0148; Type: uint8_t
-
-Bits:
- - bit0 = 1: Scanning SSID list
- - bit1 = 1: Wi-Fi connected
- - bit4 = 1: Attempting Wi-Fi connection
- - bit7 = 1: Wi-Fi disabled (power-up initialization state, normally ignored)
- - Other bits reserved (0)
-
-
-#### remote_ip/port
-
- - remote_ip: 16-byte uint8_t[] array (raw IP data, not string)
- - remote_port: uint16_t port number
-
-Default: remote_ip = ff...ff, first two bytes ff indicate invalid ip; remote_port = 0xFFFF indicates invalid port.
-
-Behavior:
  - If remote_ip or remote_port is invalid:
-   * When encryption is enabled, they are updated to the client’s IP and port after one encrypted communication.
-   * When encryption is disabled, they are updated after one plaintext UDP communication.
+   * When encryption is enabled, they are updated to the client’s IP and port upon the next encrypted communication.
+   * When encryption is disabled, they are updated upon the next plaintext UDP communication.
  - Proxy responses are sent to the updated remote_ip/port.
  - Clients should check remote_ip/port before communication:
    * If invalid, or equal to the client’s own ip and port, CD-ESP is idle and ready to communicate.
@@ -319,22 +393,11 @@ Behavior:
      it is reasonable to assume the connection has been terminated; in this case, remote_ip/port can be forcibly updated.
 
 
-#### local_ip
 
-IP addresses assigned to CD-ESP after connecting to the router:
- - First entry: IPv4 address
- - Second entry: IPv6 link-local address
- - Subsequent entries: other IPv6 addresses
+## CDBUS GUI Tool
 
+<img src="doc/reg_list.avif" alt="Your browser may not support avif images!">
 
-#### scan_start
-
-Write 1 to start Wi-Fi scanning
-
-
-#### scan_auth/rssi/ssid
-
-Results of Wi-Fi scanning
 
 
 ## Build Instructions
