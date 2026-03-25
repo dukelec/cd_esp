@@ -280,3 +280,13 @@ void cd_main_late(void)
     gpio_config(&io_conf_button);
     csa_list_show();
 }
+
+
+void cdctl_rx_cb(cd_frame_t *frame)
+{
+    if (dispatch_task_handle) {
+        BaseType_t task_woken = pdFALSE;
+        vTaskNotifyGiveFromISR(dispatch_task_handle, &task_woken);
+        portYIELD_FROM_ISR(task_woken);
+    }
+}
