@@ -16,7 +16,6 @@
 
 #include "esp_log.h"
 #include "esp_event.h"
-#include "console/console.h"
 #include "hal/cpu_hal.h"
 #include "nvs_flash.h"
 #include "esp_flash.h"
@@ -42,10 +41,11 @@
 #include "lwip/sys.h"
 #include "lwip/netdb.h"
 
-#include "mbedtls/sha256.h"
-#include "mbedtls/aes.h"
+#include "psa/crypto.h"
 
+#ifndef BLE_NAME
 #define BLE_NAME        "CD-ESP"
+#endif
 
 #define LED_W_PIN       9
 #define LED_G_PIN       8

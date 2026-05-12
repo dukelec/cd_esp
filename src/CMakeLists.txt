@@ -20,6 +20,12 @@ message(STATUS "GIT_VERSION_FULL=${GIT_VERSION_FULL}, GIT_VERSION=${GIT_VERSION}
 add_compile_definitions(SW_VER_FULL=\"${GIT_VERSION_FULL}\")
 add_compile_definitions(SW_VER=\"${GIT_VERSION}\")
 
+if(DEFINED ENV{BLE_NAME})
+    set(BLE_NAME $ENV{BLE_NAME})
+    message(STATUS "BLE_NAME=${BLE_NAME}")
+    add_compile_definitions(BLE_NAME=\"${BLE_NAME}\")
+endif()
+
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(cd_esp)

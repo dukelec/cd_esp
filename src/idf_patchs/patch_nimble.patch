@@ -1,8 +1,8 @@
 diff --git a/nimble/host/src/ble_gattc.c b/nimble/host/src/ble_gattc.c
-index a8905ec7..e81178cc 100644
+index aaf91354..5cc481af 100644
 --- a/nimble/host/src/ble_gattc.c
 +++ b/nimble/host/src/ble_gattc.c
-@@ -565,7 +565,7 @@ ble_gattc_dbg_assert_proc_not_inserted(struct ble_gattc_proc *proc)
+@@ -626,7 +626,7 @@ ble_gattc_dbg_assert_proc_not_inserted(struct ble_gattc_proc *proc)
  static void
  ble_gattc_log_proc_init(const char *name)
  {
@@ -11,7 +11,7 @@ index a8905ec7..e81178cc 100644
  }
  
  #if MYNEWT_VAL(BLE_GATTC)
-@@ -713,7 +713,7 @@ static void
+@@ -775,7 +775,7 @@ static void
  ble_gattc_log_notify(uint16_t att_handle)
  {
      ble_gattc_log_proc_init("notify; ");
@@ -19,4 +19,4 @@ index a8905ec7..e81178cc 100644
 +    //BLE_HS_LOG(INFO, "att_handle=%d\n", att_handle);
  }
  
- 
+ static void

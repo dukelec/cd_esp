@@ -91,7 +91,7 @@ static void fast_scan(void)
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
-    //esp_wifi_set_ps(WIFI_PS_NONE);
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 }
 
 
@@ -415,5 +415,5 @@ void wifi_main(void)
     fast_scan();
     xTaskCreate(udp_server_task, "udp_server", 4096, NULL, 18, NULL);
     xTaskCreate(udp_notify_task, "udp_notify_task", 4096, NULL, 18, NULL);
-    esp_coex_preference_set(ESP_COEX_PREFER_WIFI);
+    ESP_ERROR_CHECK(esp_coex_preference_set(ESP_COEX_PREFER_WIFI));
 }

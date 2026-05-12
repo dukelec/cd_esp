@@ -34,7 +34,8 @@ rx_queue = queue.Queue()
 cst = {
     'aes_key': None,
     'aes_cnt': 0,
-    'k_pwd': '123456'
+    'k_pwd': '123456',
+    'csa_cnt': 0
 }
 
 
@@ -62,7 +63,7 @@ def send_command(msg, wait=True, encrypt=False, mac=None, whdr=False):
     payload = b''
     if encrypt:
         payload += struct.pack("<H", cst['aes_cnt'])
-        cst['aes_cnt'] += 1
+        cst['aes_cnt'] = (cst['aes_cnt'] + 1) & 0xffff
     if mac != None:
         payload += struct.pack("<B", mac)
     payload += msg
@@ -103,19 +104,13 @@ def send_command(msg, wait=True, encrypt=False, mac=None, whdr=False):
 
 
 def csa_write(offset, dat, proxy=False, encrypt=False, mac=None, need_reply=True):
-    if proxy:
-        if need_reply:
-            msg = b'\x60\x05\x20' + struct.pack("<H", offset) + dat
-        else:
-            msg = b'\x60\x05\xa0' + struct.pack("<H", offset) + dat
-    else:
-        if need_reply:
-            msg = b'\x40\x05\x20' + struct.pack("<H", offset) + dat
-        else:
-            msg = b'\x40\x05\xa0' + struct.pack("<H", offset) + dat
+    h0 = (0x60 if proxy else 0x40) # | (cst['csa_cnt'] & 0xf)
+    h2 = 0x20 if need_reply else 0xa0
+    msg = struct.pack("<BBBH", h0, 0x05, h2, offset) + dat
     if need_reply:
         rx_queue.queue.clear()
     ret = send_command(msg, wait=need_reply, encrypt=encrypt, mac=mac)
+    #cst['csa_cnt'] = (cst['csa_cnt'] + 1) & 0xf
     if not need_reply:
         return None
     if ret == None or ret[2] != 0 or ret[0] != 5:
@@ -124,12 +119,11 @@ def csa_write(offset, dat, proxy=False, encrypt=False, mac=None, need_reply=True
     return ret[2:]
 
 def csa_read(offset, len_, proxy=False, encrypt=False, mac=None):
-    if proxy:
-        msg = b'\x60\x05\x00' + struct.pack("<HB", offset, len_)
-    else:
-        msg = b'\x40\x05\x00' + struct.pack("<HB", offset, len_)
+    h0 = (0x60 if proxy else 0x40) # | (cst['csa_cnt'] & 0xf)
+    msg = struct.pack("<BBBHB", h0, 0x05, 0x00, offset, len_)
     rx_queue.queue.clear()
     ret = send_command(msg, encrypt=encrypt, mac=mac)
+    #cst['csa_cnt'] = (cst['csa_cnt'] + 1) & 0xf
     if ret == None or ret[2] != 0 or ret[0] != 5:
         print(f'csa_read error at: 0x{offset:x}, len: {len_}, ret: {ret.hex()}')
         return None

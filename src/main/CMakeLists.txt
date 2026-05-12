@@ -19,4 +19,15 @@ idf_component_register(
         "."
         "usr"
         "utils"
+
+    REQUIRES
+        bt
+        mbedtls
+        esp_event
+        nvs_flash
+        spi_flash
+        esp_driver_gpio
+        esp_driver_ledc
+        esp_driver_spi
+        esp_coex
 )

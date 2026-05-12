@@ -12,8 +12,7 @@
 
 static const char *tag = "cd-main";
 
-static mbedtls_aes_context aes_enc_ctx;
-static mbedtls_aes_context aes_dec_ctx;
+static psa_key_id_t aes_key_id = 0;
 
 
 static inline size_t pkcs7_pad(uint8_t *buf, size_t len)
@@ -32,52 +31,99 @@ static inline size_t pkcs7_unpad(const uint8_t *buf, size_t len)
 
 int aes256_cbc_encrypt(uint8_t *input, size_t in_len, uint8_t *output)
 {
+    psa_status_t status;
     uint8_t iv[16] = {0};
+    psa_cipher_operation_t op = PSA_CIPHER_OPERATION_INIT;
+    size_t out_len = 0;
     size_t padded_len = pkcs7_pad(input, in_len); // input should large enough
-    if (mbedtls_aes_crypt_cbc(&aes_enc_ctx, MBEDTLS_AES_ENCRYPT, padded_len, iv, input, output))
+
+    status = psa_cipher_encrypt_setup(&op, aes_key_id, PSA_ALG_CBC_NO_PADDING);
+    if (status != PSA_SUCCESS)
         return -1;
-    return padded_len;
+
+    status = psa_cipher_set_iv(&op, iv, sizeof(iv));
+    if (status != PSA_SUCCESS)
+        goto fail;
+
+    size_t part_len = 0;
+    status = psa_cipher_update(&op, input, padded_len, output, padded_len, &part_len);
+    if (status != PSA_SUCCESS)
+        goto fail;
+    out_len = part_len;
+
+    status = psa_cipher_finish(&op, output + part_len, padded_len - part_len, &part_len);
+    if (status != PSA_SUCCESS)
+        goto fail;
+    out_len += part_len;
+
+    psa_cipher_abort(&op);
+    return out_len;
+
+fail:
+    psa_cipher_abort(&op);
+    return -1;
 }
 
 int aes256_cbc_decrypt(const uint8_t *input, size_t in_len, uint8_t *output)
 {
+    psa_status_t status;
     uint8_t iv[16] = {0};
-    if (mbedtls_aes_crypt_cbc(&aes_dec_ctx, MBEDTLS_AES_DECRYPT, in_len, iv, input, output))
+    psa_cipher_operation_t op = PSA_CIPHER_OPERATION_INIT;
+    size_t out_len = 0;
+    size_t part_len = 0;
+
+    status = psa_cipher_decrypt_setup(&op, aes_key_id, PSA_ALG_CBC_NO_PADDING);
+    if (status != PSA_SUCCESS)
         return -1;
-    return pkcs7_unpad(output, in_len);
+
+    status = psa_cipher_set_iv(&op, iv, sizeof(iv));
+    if (status != PSA_SUCCESS)
+        goto fail;
+
+    status = psa_cipher_update(&op, input, in_len, output, in_len, &part_len);
+    if (status != PSA_SUCCESS)
+        goto fail;
+    out_len = part_len;
+
+    status = psa_cipher_finish(&op, output + part_len, in_len - part_len, &part_len);
+    if (status != PSA_SUCCESS)
+        goto fail;
+    out_len += part_len;
+
+    psa_cipher_abort(&op);
+    return pkcs7_unpad(output, out_len);
+
+fail:
+    psa_cipher_abort(&op);
+    return -1;
 }
 
 static int aes256_cbc_init(const uint8_t *key)
 {
-    uint8_t key_len = 32;
-    mbedtls_aes_init(&aes_enc_ctx);
-    mbedtls_aes_init(&aes_dec_ctx);
-    if (mbedtls_aes_setkey_enc(&aes_enc_ctx, key, key_len * 8))
+    psa_status_t status;
+    psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
+
+    status = psa_crypto_init();
+    if (status != PSA_SUCCESS)
         return -1;
-    if (mbedtls_aes_setkey_dec(&aes_dec_ctx, key, key_len * 8))
-        return -1;
-    return 0;
+
+    psa_set_key_type(&attr, PSA_KEY_TYPE_AES);
+    psa_set_key_bits(&attr, 256);
+    psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_ENCRYPT | PSA_KEY_USAGE_DECRYPT);
+    psa_set_key_algorithm(&attr, PSA_ALG_CBC_NO_PADDING);
+
+    status = psa_import_key(&attr, key, 32, &aes_key_id);
+    psa_reset_key_attributes(&attr);
+
+    return (status == PSA_SUCCESS) ? 0 : -1;
 }
 
 
 static int sha256_sum(const uint8_t *data, size_t data_len, uint8_t *out_hash)
 {
-    mbedtls_sha256_context ctx;
-    mbedtls_sha256_init(&ctx);
-
-    if (mbedtls_sha256_starts(&ctx, 0)) // 0: sha256, 1: sha224
-        goto exit_err;
-    if (mbedtls_sha256_update(&ctx, data, data_len))
-        goto exit_err;
-    if (mbedtls_sha256_finish(&ctx, out_hash))
-        goto exit_err;
-
-    mbedtls_sha256_free(&ctx);
-    return 0;
-
-exit_err:
-    mbedtls_sha256_free(&ctx);
-    return -1;
+    size_t out_len = 0;
+    psa_status_t status = psa_hash_compute(PSA_ALG_SHA_256, data, data_len, out_hash, 32, &out_len);
+    return (status == PSA_SUCCESS) ? 0 : -1;
 }
 
 

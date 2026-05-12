@@ -49,84 +49,95 @@ if __name__ == "__main__":
     
     ret = send_command(b"\x60\x01", encrypt=udp_encrypt, mac=cam_mac)
     print(f"get info (proxy): {ret}")
-
-    ret = csa_write(RP_capture, b'\x02', proxy=True, encrypt=udp_encrypt, mac=cam_mac)
-    print(f"RP_capture = 0x02: {ret.hex()}")
-    sleep(0.5)
     
-    cnt_rx_ = csa_read(RP_img_len, 4, proxy=True, encrypt=udp_encrypt, mac=cam_mac)
-    img_len = struct.unpack("<I", cnt_rx_[1:])[0]
-    print(f"RP_img_len: {img_len}")
+    img_count = 0
+    while True:
+        ret = csa_write(RP_capture, b'\x80', proxy=True, encrypt=udp_encrypt, mac=cam_mac)
+        print(f"RP_capture = 0x80: {ret.hex()}")
+        
+        ret = csa_write(RP_capture, b'\x02', proxy=True, encrypt=udp_encrypt, mac=cam_mac)
+        print(f"RP_capture = 0x02: {ret.hex()}")
+        #sleep(0.5)
+        
+        while True:
+            cnt_rx_ = csa_read(RP_img_len, 4, proxy=True, encrypt=udp_encrypt, mac=cam_mac)
+            img_len = struct.unpack("<I", cnt_rx_[1:])[0]
+            print(f"RP_img_len: {img_len}")
+            if img_len != 0:
+                break
 
-    img_dat = b''
-    cnt = 0
-    pend_cnt = 0
-    batch_cnt = 0
-    req_ofs = 0
-    img_done = False
-    
-    while not img_done:
-        if pend_cnt < 2 and req_ofs < img_len:
-            req_set = struct.pack("<II", req_ofs, blk_len)
-            csa_write(RP_img_read, req_set, proxy=True, encrypt=udp_encrypt, mac=cam_mac, need_reply=False)
-            print(f"\n" + f"tx pend_cnt: {pend_cnt}, req_ofs: {req_ofs} ++++\n")
-            pend_cnt += 1
-            req_ofs += blk_len
-        elif pend_cnt:
-            rx = get_queue()
-            if rx == None:
-                print(f"timeout")
-                exit(-1)
-            if len(rx) == 1:
-                print(f"whdr err code: {rx}")
-                exit(-1)
-            
-            if rx[0] & 0x80:
-                whdr = rx[0]
-                if whdr & 0b01000000:
-                    #print(f"rx ori: {rx.hex()}")
-                    rx = aes256cbc_decrypt(cst['aes_key'], rx[1:])
-                    #print(f"rx plain: {rx.hex()}")
-                    rx = rx[2:] # skip aes cnt
+        img_dat = b''
+        cnt = 0
+        pend_cnt = 0
+        batch_cnt = 0
+        req_ofs = 0
+        img_done = False
+        
+        while not img_done:
+            if pend_cnt < 2 and req_ofs < img_len:
+                req_set = struct.pack("<II", req_ofs, blk_len)
+                print(f"\n" + f"tx pend_cnt: {pend_cnt}, req_ofs: {req_ofs} ++++ {cst['csa_cnt']}\n")
+                csa_write(RP_img_read, req_set, proxy=True, encrypt=udp_encrypt, mac=cam_mac, need_reply=False)
+                pend_cnt += 1
+                req_ofs += blk_len
+            elif pend_cnt:
+                rx = get_queue()
+                if rx == None:
+                    print(f"timeout")
+                    exit(-1)
+                if len(rx) == 1:
+                    print(f"whdr err code: {rx}")
+                    exit(-1)
+                
+                if rx[0] & 0x80:
+                    whdr = rx[0]
+                    if whdr & 0b01000000:
+                        #print(f"rx ori: {rx.hex()}")
+                        rx = aes256cbc_decrypt(cst['aes_key'], rx[1:])
+                        #print(f"rx plain: {rx.hex()}")
+                        rx = rx[2:] # skip aes cnt
+                    else:
+                        rx = rx[1:] # skip whdr
+                    if whdr & 0b00100000:
+                        rx = rx[1:] # skip tmac
+                batch_cnt += 1
+                if batch_cnt == batch_pkts:
+                    batch_cnt = 0
+                    pend_cnt -= 1
+                    #print(f"rx: {rx.hex()}, pend_cnt: {pend_cnt}")
+                    print(f"rx: ... pend_cnt: {pend_cnt}")
                 else:
-                    rx = rx[1:] # skip whdr
-                if whdr & 0b00100000:
-                    rx = rx[1:] # skip tmac
-            batch_cnt += 1
-            if batch_cnt == batch_pkts:
-                batch_cnt = 0
-                pend_cnt -= 1
-                print(f"rx: {rx.hex()}, pend_cnt: {pend_cnt}")
-            else:
-                print(f"rx: {rx.hex()}")
-            
-            idx = 0
-            while True:
-                cdn_pkt = rx[253*idx:253*idx+253]
-                if not len(cdn_pkt):
-                    break
-                if len(img_dat) == 0:
-                    if (cdn_pkt[0] & 0b11110000) != 0b01010000:
-                        print(f'first pkt is not frag 01: {cdn_pkt[0]:02x}')
-                        exit(-1)
-                    cnt = cdn_pkt[0] & 0xf
-                    img_dat += cdn_pkt[2:]
-                else:
-                    if ((cnt + 1) & 0xf) != (cdn_pkt[0] & 0xf):
-                        print(f'img cnt err: {cnt + 1 :02x} != {cdn_pkt[0] & 0xf :02x}')
-                        exit(-1)
-                    cnt += 1
-                    img_dat += cdn_pkt[2:]
-                    
-                    if (cdn_pkt[0] & 0b11110000) == 0b01110000:
-                        with open('test.jpg', 'wb') as f:
-                            f.write(img_dat)
-                        print(f'img save ok, len: {len(img_dat)}, ori_len: {img_len}')
-                        img_done = True
+                    #print(f"rx: {rx.hex()}")
+                    print(f"rx: ...")
+                
+                idx = 0
+                while True:
+                    cdn_pkt = rx[253*idx:253*idx+253]
+                    if not len(cdn_pkt):
                         break
-                idx += 1
-        else:
-            print(f"rx img missing end")
-            exit(-1)
-    
-    print('test ok')
+                    if len(img_dat) == 0:
+                        if (cdn_pkt[0] & 0b11110000) != 0b01010000:
+                            print(f'first pkt is not frag 01: {cdn_pkt[0]:02x}')
+                            exit(-1)
+                        cnt = cdn_pkt[0] & 0xf
+                        img_dat += cdn_pkt[2:]
+                    else:
+                        if ((cnt + 1) & 0xf) != (cdn_pkt[0] & 0xf):
+                            print(f'img cnt err: {cnt + 1 :02x} != {cdn_pkt[0] & 0xf :02x}')
+                            exit(-1)
+                        cnt += 1
+                        img_dat += cdn_pkt[2:]
+                        
+                        if (cdn_pkt[0] & 0b11110000) == 0b01110000:
+                            with open('test.jpg', 'wb') as f:
+                                f.write(img_dat)
+                            print(f'img save ok, len: {len(img_dat)}, ori_len: {img_len}')
+                            img_done = True
+                            break
+                    idx += 1
+            else:
+                print(f"rx img missing end")
+                exit(-1)
+        
+        img_count += 1
+        print(f'test ok, cnt: {img_count}')
