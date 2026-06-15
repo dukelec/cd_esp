@@ -16,8 +16,13 @@
 #define SERVICE_PORT    0xcdcd
 #define HOSTNAME        "cd-esp"
 #define INSTANCE_NAME   "CD-ESP"
+#if CD_DISABLE_UDP
+#define SERVICE_TYPE    "_cd-esp._tcp.local"
+#define SERVICE_ENUM    "_services._dns-sd._tcp.local"
+#else
 #define SERVICE_TYPE    "_cd-esp._udp.local"
 #define SERVICE_ENUM    "_services._dns-sd._udp.local"
+#endif
 
 
 static int dns_write_name(uint8_t *buf, int off, const char *name)

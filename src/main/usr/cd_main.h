@@ -16,6 +16,10 @@
 #include "cdbus_uart.h"
 #include "modbus_crc.h"
 
+#ifndef CD_DISABLE_UDP
+#define CD_DISABLE_UDP  0
+#endif
+
 #define APP_CONF_ADDR       0x003ff000 // last page
 #define APP_CONF_VER        0x0201
 
@@ -24,7 +28,8 @@
 typedef enum {
     INTF_485 = 0,
     INTF_BLE,
-    INTF_UDP
+    INTF_UDP,
+    INTF_TCP
 } intf_t;
 
 
@@ -114,6 +119,7 @@ int flash_cal_crc(uint32_t src_addr, uint32_t len, uint16_t *crc);
 extern list_head_t frame_free_head;
 extern list_head_t ble_rx_head;
 extern list_head_t udp_rx_head;
+extern list_head_t tcp_rx_head;
 
 int sent_cmd(uint8_t dst_mac, uint8_t *d, uint8_t d_len, bool reply, cd_frame_t **rfrm);
 void comm_service_init(void);

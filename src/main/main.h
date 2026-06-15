@@ -47,6 +47,10 @@
 #define BLE_NAME        "CD-ESP"
 #endif
 
+#ifndef CD_DISABLE_UDP
+#define CD_DISABLE_UDP  1
+#endif
+
 #define LED_W_PIN       9
 #define LED_G_PIN       8
 #define BUTTON_PIN      20
@@ -61,13 +65,17 @@
 
 
 extern TaskHandle_t dispatch_task_handle;
-extern QueueHandle_t udp_notify_queue;
+extern QueueHandle_t tcp_notify_queue;
 extern QueueHandle_t ble_notify_queue;
 extern uint16_t ble_conn_handle;
 extern uint16_t ble_notify_handle;
 
+#if !CD_DISABLE_UDP
+extern QueueHandle_t udp_notify_queue;
 extern struct sockaddr_storage udp_src_addr;
 extern bool udp_src_addr_valid;
+#endif
+extern bool tcp_src_addr_valid;
 
 void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg);
 int gatt_svr_init(void);
