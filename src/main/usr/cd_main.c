@@ -21,6 +21,7 @@ list_head_t frame_free_head = {0};
 
 list_head_t ble_rx_head = {0};
 list_head_t udp_rx_head = {0};
+list_head_t tcp_rx_head = {0};
 
 TaskHandle_t dispatch_task_handle = NULL;
 static TaskHandle_t button_task_handle = NULL;
@@ -146,7 +147,7 @@ static void led_set_g(uint8_t duty_g)
 static void dispatch_task(void *arg)
 {
     while (true) {
-        if (!cdctl_rx_head.first && !ble_rx_head.first && !udp_rx_head.first) {
+        if (!cdctl_rx_head.first && !ble_rx_head.first && !udp_rx_head.first && !tcp_rx_head.first) {
             ulTaskNotifyTake(pdTRUE, 100 / portTICK_PERIOD_MS);
             continue;
         }

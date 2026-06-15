@@ -39,6 +39,7 @@ set(PY_SCRIPT "${CMAKE_SOURCE_DIR}/tools/app_bin2hex.py")
 add_custom_command(
     OUTPUT ${HEX_FILE}
     COMMAND ${CMAKE_COMMAND} -E echo "Converting BIN to IAP HEX..." 
+    COMMAND python3 -c "import sys; print(\"python3 path: \" + sys.executable)"
     COMMAND python3 ${PY_SCRIPT} ${BIN_FILE}
     DEPENDS ${ELF_FILE}
     COMMENT "Auto converting ELF to IAP HEX"

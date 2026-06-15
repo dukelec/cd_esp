@@ -31,3 +31,7 @@ idf_component_register(
         esp_driver_spi
         esp_coex
 )
+
+if(DEFINED CD_DISABLE_UDP)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE CD_DISABLE_UDP=${CD_DISABLE_UDP})
+endif()

@@ -9,6 +9,7 @@
 
 #include "cd_main.h"
 static const char *tag = "comm-ser";
+static const char *sw_version = "1.17";
 
 char cpu_id[25] = { 0 };
 static char info_str[100];
@@ -65,14 +66,24 @@ static void send_frame(cd_frame_t *frame, uint8_t p_len)
             ESP_LOGI(tag, "reply ble cmd: enqueue err\n");
             cd_list_put(&frame_free_head, frame);
         }
-    } else if (frame->intf == INTF_UDP) {
+    } else if (frame->intf == INTF_TCP) {
+        BaseType_t ret = xQueueSend(tcp_notify_queue, (void *) &frame, (TickType_t) 0);
+        if (ret != pdPASS) {
+            ESP_LOGI(tag, "reply tcp cmd: enqueue err\n");
+            cd_list_put(&frame_free_head, frame);
+        }
+    }
+#if !CD_DISABLE_UDP
+    else if (frame->intf == INTF_UDP) {
         BaseType_t ret = xQueueSend(udp_notify_queue, (void *) &frame, (TickType_t) 0);
         //ESP_LOGI(tag, "reply udp cmd: frame: %p\n", frame);
         if (ret != pdPASS) {
             ESP_LOGI(tag, "reply udp cmd: enqueue err\n");
             cd_list_put(&frame_free_head, frame);
         }
-    } else { // reply rs485 cmd
+    }
+#endif
+    else { // reply rs485 cmd
         cdctl_put_tx_frame(frame);
     }
 }
@@ -80,8 +91,10 @@ static void send_frame(cd_frame_t *frame, uint8_t p_len)
 static void init_info_str(void)
 {
     // M: model; S: serial string; HW: hardware version; SW: software version
-    sprintf(info_str, "M: cd-esp; S: %s; SW: %s", cpu_id, SW_VER);
-    d_info("info: %s, git: %s\n", info_str, SW_VER_FULL);
+    // sprintf(info_str, "M: cd-esp; S: %s; SW: %s", cpu_id, SW_VER);
+    // d_info("info: %s, git: %s\n", info_str, SW_VER_FULL);
+    sprintf(info_str, "M: cd-esp; S: %s; SW: %s", cpu_id, sw_version);
+    d_info("info: %s, git: %s\n", info_str, sw_version);
 }
 
 
@@ -222,11 +235,16 @@ static inline void serial_cmd_dispatch(void)
                     frame->w_hdr = (csa.k_en & 2) ? 0xc0 : 0;
                     if (frame->dat[0] != csa.p_mac)
                         frame->w_hdr |= 0xa0;
-                    if (udp_src_addr_valid) {
+                    if (tcp_src_addr_valid) {
+                        ret = xQueueSend(tcp_notify_queue, (void *) &frame, (TickType_t) 0);
+                    }
+#if !CD_DISABLE_UDP
+                    else if (udp_src_addr_valid) {
                         memcpy(&frame->udp_addr, &udp_src_addr, sizeof(udp_src_addr));
                         //ESP_LOGI(tag, "forward: rs485 -> udp client, frame: %p\n", frame);
                         ret = xQueueSend(udp_notify_queue, (void *) &frame, (TickType_t) 0);
                     }
+#endif
                 } else { // ble
                     frame->w_hdr = (csa.k_en & 1) ? 0xc0 : 0;
                     if (frame->dat[0] != csa.p_mac)
@@ -260,12 +278,18 @@ static inline void serial_cmd_dispatch(void)
             frame->intf = INTF_UDP;
     }
 
+    if (!frame) {
+        frame = cd_list_get(&tcp_rx_head);
+        if (frame)
+            frame->intf = INTF_TCP;
+    }
+
     if (frame) {
         uint8_t server_num = frame->dat[4];
         uint8_t *p_dat = frame->dat + 5;
 
         if (!(frame->w_hdr & 0x40) && ((frame->intf == INTF_BLE && (csa.k_en & 1))
-                || (frame->intf == INTF_UDP && (csa.k_en & 2)))) {
+                || ((frame->intf == INTF_UDP || frame->intf == INTF_TCP) && (csa.k_en & 2)))) {
             bool is_err = true;
             uint8_t subs = p_dat[0];
 
@@ -324,4 +348,3 @@ void comm_service_poll(void)
         esp_restart();
     }
 }
-

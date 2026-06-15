@@ -15,9 +15,13 @@
 const csa_t csa_dft = {
         .magic_code = 0xcdcd,
         .conf_ver = APP_CONF_VER,
-        .bus_cfg = CDCTL_CFG_DFT(0xfe),
+        .bus_cfg = CDCTL_CFG_DFT(0x20),
         .p_mac = 0x10,
+#if CD_DISABLE_UDP
+        .k_en = 0,
+#else
         .k_en = 2,
+#endif
         .k_pwd = "123456",
         .ble_itvl_min = 6,
         .ble_itvl_max = 12,
