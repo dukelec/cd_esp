@@ -210,7 +210,8 @@ cdn_to_frame:
                 frame->dat[2] = sub_len;
                 memcpy(frame->dat + 3, sub_buf, sub_len);
                 cd_list_put(&ble_rx_head, frame);
-                xTaskNotifyGive(dispatch_task_handle);
+                if (dispatch_task_handle)
+                    xTaskNotifyGive(dispatch_task_handle);
                 portYIELD();
             } else {
                 ESP_LOGE(tag, "rx no free frame");

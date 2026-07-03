@@ -1,7 +1,17 @@
 CD-ESP
 =======================================
 
-An ESP32C3-based CDBUS (RS-485) wireless bridge with BLE and Wi-Fi support.
+An ESP32-C3-based CDBUS (RS-485) wireless bridge with BLE and Wi-Fi support.
+
+
+## Features
+
+ - Transparent BLE and Wi-Fi (UDP) bridge to the RS-485 / CDBUS bus
+ - Acts as a proxy to reach any node on the RS-485 bus, or the CD-ESP itself
+ - Optional AES-256 encryption, independently switchable for BLE and UDP
+ - mDNS discovery — reachable via the `cd-esp.local` hostname
+ - Fully configurable through a parameter table over BLE, RS-485, or UDP
+ - Firmware upgrade via RS-485 IAP, BLE/UDP OTA, or the USB port
 
 
 ## Communication Interfaces
@@ -27,16 +37,17 @@ The payload is encoded using the CDNET protocol. For detailed information, pleas
 
 #### Advertising:
 
-The full device name is: `CD-ESP XXXXXX`
+The full device name is: `CD-ESP XXXX`
 
-`XXXXXX` represents the first 3 bytes of the device MAC address.  
-Example: `CD-ESP dc1ed5`
+`XXXX` represents the two least-significant bytes of the device address in uppercase hex
+(byte[1] followed by byte[0]).  
+Example: `CD-ESP A1B2`
 
 Manufacturer Specific Data: 6-byte full device address.
 
 #### Service & Characteristics:
 
-Service UUID：`b3340001-56ba-40b1-8ecb-8fe18dfffddd`
+Service UUID: `b3340001-56ba-40b1-8ecb-8fe18dfffddd`
 
 Characteristic RX:
  - UUID: `b3340002-56ba-40b1-8ecb-8fe18dfffddd`

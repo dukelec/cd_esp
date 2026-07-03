@@ -117,7 +117,7 @@ static void p8_handler(cd_frame_t *frame)
 
     } else if (*p_dat == 0x00 && p_len == 6) {
         uint32_t addr = get_unaligned32(p_dat + 1);
-        uint8_t len = min(p_dat[5], CDN_MAX_DAT - 1);
+        uint8_t len = min(p_dat[5], CDN_MAX_PAYLOAD - 1);
         int ret = esp_flash_read(NULL, p_dat + 1, addr, len);
         *p_dat = ret ? 1 : 0;
         if (reply)
@@ -164,7 +164,11 @@ static void p5_handler(cd_frame_t *frame)
 
     if (*p_dat == 0x00 && p_len == 4) {
         uint16_t offset = get_unaligned16(p_dat + 1);
-        uint8_t len = min(p_dat[3], CDN_MAX_DAT - 1);
+        uint8_t len = min(p_dat[3], CDN_MAX_PAYLOAD - 1);
+        if (offset >= sizeof(csa_t))
+            len = 0;
+        else if (offset + len > sizeof(csa_t))
+            len = sizeof(csa_t) - offset;
         cd_irq_save(&p5_lock, flags);
         memcpy(p_dat + 1, ((void *) &csa) + offset, len);
         cd_irq_restore(&p5_lock, flags);
@@ -187,7 +191,11 @@ static void p5_handler(cd_frame_t *frame)
 
     } else if (*p_dat == 0x01 && p_len == 4) {
         uint16_t offset = get_unaligned16(p_dat + 1);
-        uint8_t len = min(p_dat[3], CDN_MAX_DAT - 1);
+        uint8_t len = min(p_dat[3], CDN_MAX_PAYLOAD - 1);
+        if (offset >= sizeof(csa_t))
+            len = 0;
+        else if (offset + len > sizeof(csa_t))
+            len = sizeof(csa_t) - offset;
         memcpy(p_dat + 1, ((void *) &csa_dft) + offset, len);
         *p_dat = 0;
         if (reply)

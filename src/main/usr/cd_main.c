@@ -213,16 +213,16 @@ static int multi_output_vprintf(const char *fmt, va_list args) {
     char buf[256];
     int len = vsnprintf(buf, sizeof(buf), fmt, args);
     if (len > 0) {
-        if (len >= 2) {
-            if (buf[len-2] == buf[len-1])
-                len--; // "\n\n" -> "\n"
-        }
+        if (len >= (int)sizeof(buf))
+            len = sizeof(buf) - 1; // vsnprintf returns would-be length on truncation
+        if (len >= 2 && buf[len-1] == '\n' && buf[len-2] == '\n')
+            len--; // "\n\n" -> "\n"
         fwrite(buf, 1, len, stdout);
 
         if (csa.dbg_en) {
             cd_frame_t *frm = cd_list_get(&frame_free_head);
             if (frm) {
-                len = min(CDN_MAX_DAT - 2, len);
+                len = min(CDN_MAX_PAYLOAD, len);
                 frm->dat[0] = bus_mac;
                 frm->dat[1] = 0;
                 frm->dat[2] = 2 + len;

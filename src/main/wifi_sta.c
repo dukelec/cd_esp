@@ -212,7 +212,8 @@ static void udp_server_task(void *arg)
                         memcpy(&frame->udp_addr, &source_addr, sizeof(source_addr));
 
                         cd_list_put(&udp_rx_head, frame);
-                        xTaskNotifyGive(dispatch_task_handle);
+                        if (dispatch_task_handle)
+                            xTaskNotifyGive(dispatch_task_handle);
                         portYIELD();
                     } else {
                         ESP_LOGE(tag, "rx no free frame");

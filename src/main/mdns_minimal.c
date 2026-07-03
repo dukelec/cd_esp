@@ -37,22 +37,35 @@ static int dns_write_name(uint8_t *buf, int off, const char *name)
     return off;
 }
 
-static void dns_read_name(const uint8_t *buf, int off, char *out, int outlen)
+// parse the first question of a received packet; reads qname and returns qtype,
+// or -1 if the packet is too short / malformed. every index is bounded by len.
+static int dns_parse_query(const uint8_t *buf, int len, char *out, int outlen)
 {
+    if (len < 12)
+        return -1;
+
     int pos = 0;
-    while (buf[off]) {
-        int len = buf[off++];
-        if (pos + len + 1 >= outlen)
-            break;
-        memcpy(out + pos, &buf[off], len);
-        pos += len;
+    int off = 12; // skip dns header
+    while (off < len && buf[off]) {
+        int l = buf[off++];
+        if (off + l > len || pos + l + 1 >= outlen)
+            return -1;
+        memcpy(out + pos, &buf[off], l);
+        pos += l;
         out[pos++] = '.';
-        off += len;
+        off += l;
     }
+    if (off >= len) // no root label within the packet
+        return -1;
     if (pos)
         out[pos - 1] = 0;
     else
         out[0] = 0;
+    off++; // skip the zero-length root label
+
+    if (off + 2 > len) // need 2 bytes of qtype
+        return -1;
+    return (buf[off] << 8) | buf[off + 1];
 }
 
 
@@ -63,12 +76,13 @@ static void mdns_send_response(int sock, int is_ipv6, const char *qname, uint16_
 
     // dns header
     pkt[2] = 0x84; // response + authoritative
-    pkt[7] = 0x05; // ancount = 5 (ptr + srv + txt + a + aaaa)
 
     int off = 12;
+    int ancount = 4; // srv + txt + a + aaaa; ptr added below when matched
 
     // ptr _services._dns-sd._udp.local
     if (qtype == 12 && strcmp(qname, SERVICE_ENUM) == 0) {
+        ancount++;
         off = dns_write_name(pkt, off, SERVICE_ENUM);
         pkt[off++] = 0x00; pkt[off++] = 0x0c; // ptr
         pkt[off++] = 0x00; pkt[off++] = 0x01; // IN
@@ -82,6 +96,7 @@ static void mdns_send_response(int sock, int is_ipv6, const char *qname, uint16_
 
     // ptr _cd-esp._udp.local
     if (qtype == 12 && strcmp(qname, SERVICE_TYPE) == 0) {
+        ancount++;
         off = dns_write_name(pkt, off, SERVICE_TYPE);
         pkt[off++] = 0x00; pkt[off++] = 0x0c; // ptr
         pkt[off++] = 0x00; pkt[off++] = 0x01;
@@ -133,6 +148,8 @@ static void mdns_send_response(int sock, int is_ipv6, const char *qname, uint16_
     pkt[off++] = 0x00; pkt[off++] = 0x10; // rdlen = 16
     memcpy(&pkt[off], csa.local_ip[1], 16);
     off += 16;
+
+    pkt[7] = ancount; // actual answer count (4 or 5)
 
     // multicast send
     if (is_ipv6) {
@@ -216,13 +233,9 @@ static void mdns_server_task(void *arg)
                     break;
 
                 char qname[128];
-                dns_read_name(rx_buf, 12, qname, sizeof(qname));
-
-                int qoff = 12;
-                while (rx_buf[qoff])
-                    qoff += rx_buf[qoff] + 1;
-                qoff += 1;
-                uint16_t qtype = (rx_buf[qoff] << 8) | rx_buf[qoff + 1];
+                int qtype = dns_parse_query(rx_buf, len, qname, sizeof(qname));
+                if (qtype < 0)
+                    continue;
 
                 mdns_send_response(sock4, 0, qname, qtype);
             }
@@ -236,13 +249,9 @@ static void mdns_server_task(void *arg)
                     break;
 
                 char qname[128];
-                dns_read_name(rx_buf, 12, qname, sizeof(qname));
-
-                int qoff = 12;
-                while (rx_buf[qoff])
-                    qoff += rx_buf[qoff] + 1;
-                qoff += 1;
-                uint16_t qtype = (rx_buf[qoff] << 8) | rx_buf[qoff + 1];
+                int qtype = dns_parse_query(rx_buf, len, qname, sizeof(qname));
+                if (qtype < 0)
+                    continue;
 
                 mdns_send_response(sock6, 1, qname, qtype);
             }
