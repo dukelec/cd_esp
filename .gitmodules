@@ -1,0 +1,7 @@
+[submodule "cdnet_main"]
+	path = src/main/cdnet
+	url = ../cdnet
+
+[submodule "cdnet_bl"]
+	path = src/bootloader_components/cd_boot_hooks/cdnet
+	url = ../cdnet

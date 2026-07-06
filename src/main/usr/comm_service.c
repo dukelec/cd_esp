@@ -37,7 +37,7 @@ int sent_cmd(uint8_t dst_mac, uint8_t *d, uint8_t d_len, bool reply, cd_frame_t 
     frm->dat[1] = dst_mac;
     frm->dat[2] = d_len;
     memcpy(frm->dat + 3, d, d_len);
-    cdctl_put_tx_frame(frm);
+    cdctl_send_frame(&r_dev.cd_dev, frm);
     if (!reply)
         return 0;
 
@@ -73,7 +73,7 @@ static void send_frame(cd_frame_t *frame, uint8_t p_len)
             cd_list_put(&frame_free_head, frame);
         }
     } else { // reply rs485 cmd
-        cdctl_put_tx_frame(frame);
+        cdctl_send_frame(&r_dev.cd_dev, frame);
     }
 }
 
@@ -216,7 +216,7 @@ static inline void serial_cmd_dispatch(void)
     if (frame) {
         frame->intf = INTF_BLE;
     } else {
-        frame = cd_list_get(&cdctl_rx_head);
+        frame = cdctl_recv_frame(&r_dev.cd_dev);
         if (frame) {
             BaseType_t ret = pdFAIL;
             frame->intf = INTF_485;
@@ -297,7 +297,7 @@ static inline void serial_cmd_dispatch(void)
             // forward: ble central / udp client -> rs485
             frame->dat[0] = bus_mac;
             frame->dat[3] |= 0b00100000;
-            cdctl_put_tx_frame(frame);
+            cdctl_send_frame(&r_dev.cd_dev, frame);
         } else {
             //ESP_LOGI(tag, "cmd %d\n", server_num);
             switch (server_num) {
@@ -328,7 +328,9 @@ void comm_service_poll(void)
         save_conf();
     }
     if (csa.do_reboot) {
-        ESP_LOGI(tag, "do_reboot ...\n");
+        // 1: reboot and stay in bootloader; 2: reboot and boot app
+        REG_WRITE(BL_ARGS_REG, 0xcdcd0000 | csa.do_reboot);
+        ESP_LOGI(tag, "do_reboot (%d) ...\n", csa.do_reboot);
         esp_restart();
     }
 }

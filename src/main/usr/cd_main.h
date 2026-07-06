@@ -19,6 +19,9 @@
 #define APP_CONF_ADDR       0x003ff000 // last page
 #define APP_CONF_VER        0x0201
 
+// cross-reset flag to the bootloader (keep same as bootloader cd_config.h)
+#define BL_ARGS_REG         RTC_CNTL_STORE0_REG
+
 #define FRAME_MAX           40
 
 typedef enum {
@@ -114,6 +117,7 @@ int flash_cal_crc(uint32_t src_addr, uint32_t len, uint16_t *crc);
 extern list_head_t frame_free_head;
 extern list_head_t ble_rx_head;
 extern list_head_t udp_rx_head;
+extern cdctl_dev_t r_dev;
 
 int sent_cmd(uint8_t dst_mac, uint8_t *d, uint8_t d_len, bool reply, cd_frame_t **rfrm);
 void comm_service_init(void);

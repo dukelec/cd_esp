@@ -10,6 +10,9 @@ cd $IDF_PATH
 echo "apply patch_spi.patch"
 git apply $PATCH_PATH/patch_spi.patch
 
+echo "apply patch_bl_ld.patch"
+git apply $PATCH_PATH/patch_bl_ld.patch
+
 echo "apply patch_nimble.patch"
 cd $IDF_PATH/components/bt/host/nimble/nimble
 git apply $PATCH_PATH/patch_nimble.patch

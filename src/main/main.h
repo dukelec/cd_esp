@@ -19,6 +19,8 @@
 #include "hal/cpu_hal.h"
 #include "nvs_flash.h"
 #include "esp_flash.h"
+#include "soc/gpio_reg.h"
+#include "soc/rtc_cntl_reg.h"
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 #include "driver/spi_master.h"

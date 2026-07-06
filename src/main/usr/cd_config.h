@@ -10,12 +10,13 @@
 #ifndef __CD_CONFIG_H__
 #define __CD_CONFIG_H__
 
-#define CDCTL_OSC_CLK       8000000UL // 8MHz
+#define CDCTL_OSC_CLK       40000000UL // 40MHz
 
-//#define CD_ARCH_SPI
+#define CD_ARCH_SPI_DMA
 
 #define CD_FRAME_SIZE       258
-#define CDN_MAX_PAYLOAD     251 // max user payload; +2 byte ports = 253 (dat[2] max)
+#define CD_FRAME_TYPE       "cd_frame.h" // custom cd_frame_t
+#define CDN_MAX_PAYLOAD     251
 
 #define CD_DEBUG
 //#define CD_VERBOSE
