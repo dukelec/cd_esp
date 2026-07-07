@@ -89,7 +89,6 @@ static void notify_task(void *arg)
     uint8_t frag_cnt = 0;
 
     while (true) {
-        bool fragment = false;
         while (head_left.len) {
             frame = cd_list_get(&head_left);
             cd_list_put(&head_in, frame);
@@ -133,7 +132,6 @@ static void notify_task(void *arg)
                     cd_list_put(&head_left, frame);
                     continue;
                 }
-                fragment = true;
                 uint8_t l = frame->dat[2];
                 memcpy(tx_buf + 4 + len, frame->dat + 3, l);
                 len += l;
@@ -154,25 +152,23 @@ static void notify_task(void *arg)
         }
 
         uint8_t *dat = tx_buf + 4;
-        bool big_mtu = csa.ble_mtu_cur >= 498;
-        if (fragment && !(tx_buf[3] & 0x80) && len > 495)
-            tx_buf[3] = 0x80;
+        uint16_t mtu = csa.ble_mtu_cur ? csa.ble_mtu_cur : 23; // 23: default att mtu before exchange
+        uint16_t limit = mtu >= 498 ? 495 : min(244, mtu - 3);
+        if (!(tx_buf[3] & 0x80) && len > limit)
+            tx_buf[3] = 0x80; // add w_hdr to allow fragmentation
+        if (tx_buf[3] & 0x80)
+            limit--;
 
         while (true) {
             uint8_t *p = dat;
-            uint16_t limit = big_mtu ? 495 : 244;
-            if (tx_buf[3] & 0x80)
-                limit--;
             uint16_t l = min(limit, len);
-            if (!l)
-                break;
             dat += l;
             len -= l;
             if (tx_buf[3] & 0x80) {
                 p--;
                 l++;
-                *p = tx_buf[3] & 0b11100000;
-                if (p != tx_buf + 3 || len) {
+                if (p != tx_buf + 3 || len) { // fragmented
+                    *p = tx_buf[3] & 0b11100000;
                     if (p == tx_buf + 3)
                         *p |= (frag_cnt++ & 7) | 0x08;
                     else if (len)
@@ -180,6 +176,9 @@ static void notify_task(void *arg)
                     else
                         *p |= (frag_cnt++ & 7) | 0x18;
                 }
+                // else: single packet, keep w_hdr bit[2:0] as-is (err_code)
+            } else if (!l) {
+                break;
             }
             do {
                 om = ble_hs_mbuf_from_flat(p, l);
@@ -189,12 +188,13 @@ static void notify_task(void *arg)
                 }
             } while (om == NULL);
 
-
             int rc = ble_gatts_notify_custom(ble_conn_handle, ble_notify_handle, om);
             if (rc != 0) {
                 ESP_LOGE(tag, "error while sending notification; rc = %d", rc);
                 vTaskDelay(100 / portTICK_PERIOD_MS);
             }
+            if (!len)
+                break;
         }
     }
 }
@@ -229,6 +229,7 @@ static int gatts_gap_event(struct ble_gap_event *event, void *arg)
         csa.k_st_ble = false;
         csa.ble_mtu_cur = 0;
         csa.ble_itvl_cur = 0;
+        gatt_svr_rx_reset();
         if (!csa.ble_stop)
             gatts_advertise(); // connection terminated; resume advertising
         break;

@@ -73,6 +73,7 @@ extern bool udp_src_addr_valid;
 
 void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg);
 int gatt_svr_init(void);
+void gatt_svr_rx_reset(void);
 
 void ble_maintain_task(void);
 void wifi_maintain_task(void);

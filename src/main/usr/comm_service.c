@@ -286,9 +286,9 @@ static inline void serial_cmd_dispatch(void)
             }
             if (is_err) {
                 ESP_LOGI(tag, "cmd err, !key, intf: %d\n", frame->intf);
-                cd_list_put(&frame_free_head, frame);
                 if (frame->intf == INTF_BLE)
                     ble_gap_terminate(ble_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+                cd_list_put(&frame_free_head, frame);
                 return;
             }
         }

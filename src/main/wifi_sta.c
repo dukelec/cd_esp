@@ -121,10 +121,10 @@ static void udp_server_task(void *arg)
         ESP_LOGI(tag, "socket bound, port %d", PORT);
 
         struct sockaddr_storage source_addr; // large enough for both ipv4 or ipv6
-        socklen_t socklen = sizeof(source_addr);
 
         while (true) {
             //ESP_LOGI(tag, "waiting for data");
+            socklen_t socklen = sizeof(source_addr); // recvfrom may shrink it, reset every time
             int len = recvfrom(udp_sock, rx_buf + 3, sizeof(rx_buf) - 3, 0, (struct sockaddr *)&source_addr, &socklen);
             if (len < 0) {
                 ESP_LOGE(tag, "recvfrom failed: errno %d", errno);
@@ -303,7 +303,8 @@ static void udp_notify_task(void *arg)
                     xQueueReceive(udp_notify_queue, &frame, 50 / portTICK_PERIOD_MS);
                 if (!frame)
                     break;
-                if (frame->w_hdr != tx_buf[3] || mac != frame->dat[0]) {
+                if (frame->w_hdr != tx_buf[3] || mac != frame->dat[0]
+                        || memcmp(&frame->udp_addr, &udp_addr, sizeof(udp_addr))) {
                     cd_list_put(&head_left, frame);
                     continue;
                 }

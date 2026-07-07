@@ -23,9 +23,13 @@ static inline size_t pkcs7_pad(uint8_t *buf, size_t len)
     return len + pad_len;
 }
 
-static inline size_t pkcs7_unpad(const uint8_t *buf, size_t len)
+static inline int pkcs7_unpad(const uint8_t *buf, size_t len)
 {
+    if (!len)
+        return -1;
     uint8_t pad_len = buf[len - 1];
+    if (pad_len == 0 || pad_len > 16 || pad_len > len)
+        return -1;
     return len - pad_len;
 }
 

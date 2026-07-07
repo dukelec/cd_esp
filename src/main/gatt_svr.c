@@ -25,6 +25,15 @@
 static uint8_t rx_buf[RX_BUF_SIZE] __attribute__((aligned(4))) = {0};
 static uint16_t rx_pos = 4;
 static uint8_t frag_cnt = 0;
+static bool skip_err_rpt = false;
+static bool frag_cnt_err = false;
+
+void gatt_svr_rx_reset(void)
+{
+    rx_pos = 4;
+    frag_cnt_err = false;
+    skip_err_rpt = false;
+}
 
 static const char *tag = "cd-ble";
 uint16_t ble_notify_handle;
@@ -86,8 +95,6 @@ static int gatt_svr_chr_write(uint16_t conn_handle, uint16_t attr_handle,
 static int gatt_svr_read_write_long_test(uint16_t conn_handle, uint16_t attr_handle,
         struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
-    static bool skip_err_rpt = false;
-    static bool frag_cnt_err = false;
     uint16_t uuid16 = extract_uuid16_from_thrpt_uuid128(ctxt->chr->uuid);
     assert(uuid16 != 0);
 
@@ -99,6 +106,11 @@ static int gatt_svr_read_write_long_test(uint16_t conn_handle, uint16_t attr_han
 
         int rc = gatt_svr_chr_write(conn_handle, attr_handle, ctxt->om, 0, cur_free, cur_buf, NULL);
         //ESP_LOGI(tag, "BLE_GATT_ACCESS_OP_WRITE_CHR, len: %d\n", len);
+        if (rc != 0) {
+            rx_pos = 4;
+            frag_cnt_err = true; // let the last fragment report the error
+            return rc;
+        }
 
         uint8_t w_hdr;
         uint8_t tgt_mac;
