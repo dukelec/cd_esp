@@ -7,6 +7,7 @@
  * Author: Duke Fong <d@d-l.io>
  */
 
+#include "esp_mac.h"
 #include "main.h"
 #include "cd_main.h"
 
@@ -18,6 +19,9 @@
 #define INSTANCE_NAME   "CD-ESP"
 #define SERVICE_TYPE    "_cd-esp._udp.local"
 #define SERVICE_ENUM    "_services._dns-sd._udp.local"
+
+static char hostname_local[32]; // "cd-esp-xxxx.local"
+static char instance_svc[48];   // "CD-ESP-XXXX._cd-esp._udp.local"
 
 
 static int dns_write_name(uint8_t *buf, int off, const char *name)
@@ -73,9 +77,12 @@ static int dns_parse_query(const uint8_t *buf, int len, char *out, int outlen)
 
 static void mdns_send_response(int sock, int is_ipv6, const char *qname, uint16_t qtype)
 {
-    if (strcasecmp(qname, HOSTNAME ".local") && strcasecmp(qname, SERVICE_TYPE)
-            && strcasecmp(qname, SERVICE_ENUM) && strcasecmp(qname, INSTANCE_NAME "." SERVICE_TYPE))
+    if (strcasecmp(qname, hostname_local) && strcasecmp(qname, SERVICE_TYPE)
+            && strcasecmp(qname, SERVICE_ENUM) && strcasecmp(qname, instance_svc))
         return; // dns name is case-insensitive; only answer queries for our own names
+
+    bool has_v4 = get_unaligned16(csa.local_ip[0]) != 0xffff;
+    bool has_v6 = get_unaligned16(csa.local_ip[1]) != 0xffff;
 
     uint8_t pkt[512];
     memset(pkt, 0, sizeof(pkt));
@@ -84,7 +91,7 @@ static void mdns_send_response(int sock, int is_ipv6, const char *qname, uint16_
     pkt[2] = 0x84; // response + authoritative
 
     int off = 12;
-    int ancount = 4; // srv + txt + a + aaaa; ptr added below when matched
+    int ancount = 2 + has_v4 + has_v6; // srv + txt; ptr added below when matched
 
     // ptr _services._dns-sd._udp.local
     if (qtype == 12 && strcasecmp(qname, SERVICE_ENUM) == 0) {
@@ -109,13 +116,13 @@ static void mdns_send_response(int sock, int is_ipv6, const char *qname, uint16_
         pkt[off++] = 0x00; pkt[off++] = 0x00; pkt[off++] = 0x00; pkt[off++] = 0x3c;
         int rdlen = off; off += 2;
         int start = off;
-        off = dns_write_name(pkt, off, INSTANCE_NAME "." SERVICE_TYPE);
+        off = dns_write_name(pkt, off, instance_svc);
         pkt[rdlen]     = (off - start) >> 8;
         pkt[rdlen + 1] = (off - start) & 0xff;
     }
 
     // srv
-    off = dns_write_name(pkt, off, INSTANCE_NAME "." SERVICE_TYPE);
+    off = dns_write_name(pkt, off, instance_svc);
     pkt[off++] = 0x00; pkt[off++] = 0x21; // srv
     pkt[off++] = 0x00; pkt[off++] = 0x01; // in
     pkt[off++] = 0x00; pkt[off++] = 0x00; pkt[off++] = 0x00; pkt[off++] = 0x3c; // ttl
@@ -125,37 +132,41 @@ static void mdns_send_response(int sock, int is_ipv6, const char *qname, uint16_
     pkt[off++] = 0x00; pkt[off++] = 0x00; // weight
     pkt[off++] = SERVICE_PORT >> 8;
     pkt[off++] = SERVICE_PORT & 0xff;
-    off = dns_write_name(pkt, off, HOSTNAME ".local");
+    off = dns_write_name(pkt, off, hostname_local);
     pkt[rdlen]     = (off - start) >> 8;
     pkt[rdlen + 1] = (off - start) & 0xff;
 
     // txt (empty)
-    off = dns_write_name(pkt, off, INSTANCE_NAME "." SERVICE_TYPE);
+    off = dns_write_name(pkt, off, instance_svc);
     pkt[off++] = 0x00; pkt[off++] = 0x10; // txt
     pkt[off++] = 0x00; pkt[off++] = 0x01;
     pkt[off++] = 0x00; pkt[off++] = 0x00; pkt[off++] = 0x00; pkt[off++] = 0x3c; // ttl
     pkt[off++] = 0x00; pkt[off++] = 0x01; // rdlength
     pkt[off++] = 0x00; // empty
 
-    // a
-    off = dns_write_name(pkt, off, HOSTNAME ".local");
-    pkt[off++] = 0x00; pkt[off++] = 0x01; // a
-    pkt[off++] = 0x00; pkt[off++] = 0x01; // in
-    pkt[off++] = 0x00; pkt[off++] = 0x00; pkt[off++] = 0x00; pkt[off++] = 0x3c; // ttl
-    pkt[off++] = 0x00; pkt[off++] = 0x04; // rdlen
-    memcpy(&pkt[off], csa.local_ip[0] + 12, 4);
-    off += 4;
+    // a (skip if no ipv4 address yet)
+    if (has_v4) {
+        off = dns_write_name(pkt, off, hostname_local);
+        pkt[off++] = 0x00; pkt[off++] = 0x01; // a
+        pkt[off++] = 0x00; pkt[off++] = 0x01; // in
+        pkt[off++] = 0x00; pkt[off++] = 0x00; pkt[off++] = 0x00; pkt[off++] = 0x3c; // ttl
+        pkt[off++] = 0x00; pkt[off++] = 0x04; // rdlen
+        memcpy(&pkt[off], csa.local_ip[0] + 12, 4);
+        off += 4;
+    }
 
-    // aaaa
-    off = dns_write_name(pkt, off, HOSTNAME ".local");
-    pkt[off++] = 0x00; pkt[off++] = 0x1c; // aaaa
-    pkt[off++] = 0x00; pkt[off++] = 0x01; // in
-    pkt[off++] = 0x00; pkt[off++] = 0x00; pkt[off++] = 0x00; pkt[off++] = 0x3c; // ttl
-    pkt[off++] = 0x00; pkt[off++] = 0x10; // rdlen = 16
-    memcpy(&pkt[off], csa.local_ip[1], 16);
-    off += 16;
+    // aaaa (skip if no ipv6 address yet)
+    if (has_v6) {
+        off = dns_write_name(pkt, off, hostname_local);
+        pkt[off++] = 0x00; pkt[off++] = 0x1c; // aaaa
+        pkt[off++] = 0x00; pkt[off++] = 0x01; // in
+        pkt[off++] = 0x00; pkt[off++] = 0x00; pkt[off++] = 0x00; pkt[off++] = 0x3c; // ttl
+        pkt[off++] = 0x00; pkt[off++] = 0x10; // rdlen = 16
+        memcpy(&pkt[off], csa.local_ip[1], 16);
+        off += 16;
+    }
 
-    pkt[7] = ancount; // actual answer count (4 or 5)
+    pkt[7] = ancount; // actual answer count
 
     // multicast send
     if (is_ipv6) {
@@ -274,7 +285,12 @@ static void mdns_server_task(void *arg)
 
 void mdns_init(void)
 {
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_BT); // same suffix as the ble device name
+    snprintf(hostname_local, sizeof(hostname_local), HOSTNAME "-%02x%02x.local", mac[4], mac[5]);
+    snprintf(instance_svc, sizeof(instance_svc), INSTANCE_NAME "-%02X%02X." SERVICE_TYPE, mac[4], mac[5]);
+
     xTaskCreate(mdns_server_task, "mdns_server", 4096, NULL, 18, NULL);
-    ESP_LOGI(TAG, "mdns_init done");
+    ESP_LOGI(TAG, "mdns_init done, hostname: %s", hostname_local);
 }
 

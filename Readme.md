@@ -9,7 +9,7 @@ An ESP32-C3-based CDBUS (RS-485) wireless bridge with BLE and Wi-Fi support.
  - Transparent BLE and Wi-Fi (UDP) bridge to the RS-485 / CDBUS bus
  - Acts as a proxy to reach any node on the RS-485 bus, or the CD-ESP itself
  - Optional AES-256 encryption, independently switchable for BLE and UDP
- - mDNS discovery — reachable via the `cd-esp.local` hostname
+ - mDNS discovery — reachable via the `cd-esp-xxxx.local` hostname
  - Fully configurable through a parameter table over BLE, RS-485, or UDP
  - Firmware upgrade via RS-485 IAP, BLE/UDP OTA, or the USB port
 
@@ -63,7 +63,7 @@ Characteristic TX:
 For initial setup, the device must be provisioned via BLE or RS-485.
 After successfully connecting to the specified Wi-Fi access point,
 the device IP address can be queried via BLE or RS-485, discovered through the local mDNS service,
-or accessed directly using the `cd-esp.local` hostname.
+or accessed directly using the `cd-esp-xxxx.local` hostname (`xxxx`: same suffix as the BLE name).
 
 Subsequent communication uses the device UDP port 52685 (0xCDCD) for data transmission and reception.
 
