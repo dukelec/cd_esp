@@ -17,6 +17,8 @@ static cd_spinlock_t p5_lock = {0};
 static QueueHandle_t cmd_rx_queue = NULL;
 
 
+// must not be called from dispatch_task: it relies on dispatch_task
+// to send from local_tx_head and to fill cmd_rx_queue with the reply
 int sent_cmd(uint8_t dst_mac, uint8_t *d, uint8_t d_len, bool reply, cd_frame_t **rfrm)
 {
     cd_frame_t *frm = NULL;
@@ -37,7 +39,9 @@ int sent_cmd(uint8_t dst_mac, uint8_t *d, uint8_t d_len, bool reply, cd_frame_t 
     frm->dat[1] = dst_mac;
     frm->dat[2] = d_len;
     memcpy(frm->dat + 3, d, d_len);
-    cdctl_send_frame(&r_dev.cd_dev, frm);
+    cd_list_put(&local_tx_head, frm);
+    if (dispatch_task_handle)
+        xTaskNotifyGive(dispatch_task_handle);
     if (!reply)
         return 0;
 

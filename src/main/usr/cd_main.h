@@ -117,6 +117,7 @@ int flash_cal_crc(uint32_t src_addr, uint32_t len, uint16_t *crc);
 extern list_head_t frame_free_head;
 extern list_head_t ble_rx_head;
 extern list_head_t udp_rx_head;
+extern list_head_t local_tx_head;
 extern cdctl_dev_t r_dev;
 
 int sent_cmd(uint8_t dst_mac, uint8_t *d, uint8_t d_len, bool reply, cd_frame_t **rfrm);

@@ -43,6 +43,8 @@ static int dns_parse_query(const uint8_t *buf, int len, char *out, int outlen)
 {
     if (len < 12)
         return -1;
+    if (buf[2] & 0x80) // qr bit: ignore response packets, avoid answering other responders
+        return -1;
 
     int pos = 0;
     int off = 12; // skip dns header
@@ -71,6 +73,10 @@ static int dns_parse_query(const uint8_t *buf, int len, char *out, int outlen)
 
 static void mdns_send_response(int sock, int is_ipv6, const char *qname, uint16_t qtype)
 {
+    if (strcasecmp(qname, HOSTNAME ".local") && strcasecmp(qname, SERVICE_TYPE)
+            && strcasecmp(qname, SERVICE_ENUM) && strcasecmp(qname, INSTANCE_NAME "." SERVICE_TYPE))
+        return; // dns name is case-insensitive; only answer queries for our own names
+
     uint8_t pkt[512];
     memset(pkt, 0, sizeof(pkt));
 
@@ -81,7 +87,7 @@ static void mdns_send_response(int sock, int is_ipv6, const char *qname, uint16_
     int ancount = 4; // srv + txt + a + aaaa; ptr added below when matched
 
     // ptr _services._dns-sd._udp.local
-    if (qtype == 12 && strcmp(qname, SERVICE_ENUM) == 0) {
+    if (qtype == 12 && strcasecmp(qname, SERVICE_ENUM) == 0) {
         ancount++;
         off = dns_write_name(pkt, off, SERVICE_ENUM);
         pkt[off++] = 0x00; pkt[off++] = 0x0c; // ptr
@@ -95,7 +101,7 @@ static void mdns_send_response(int sock, int is_ipv6, const char *qname, uint16_
     }
 
     // ptr _cd-esp._udp.local
-    if (qtype == 12 && strcmp(qname, SERVICE_TYPE) == 0) {
+    if (qtype == 12 && strcasecmp(qname, SERVICE_TYPE) == 0) {
         ancount++;
         off = dns_write_name(pkt, off, SERVICE_TYPE);
         pkt[off++] = 0x00; pkt[off++] = 0x0c; // ptr
