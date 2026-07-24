@@ -11,10 +11,10 @@ import math
 from time import sleep
 from _udp_common import *
 
-"""Example of batched packet writes for an mbrush2 dpt file
+"""Example of batched packet writes for an mbrush2 dptz file
 
 Usage:
-  ./udp_send_file.py x.dpt
+  ./udp_send_file.py x.dptz
 """
 
 udp_encrypt = True
@@ -23,7 +23,8 @@ udp_encrypt = True
 RP_p_ctrl = 0x01ac
 RP_d_ctrl = 0x01ad
 RP_e_ctrl = 0x01ae
-RP_w_offset = 0x0248
+RP_dptz_rx = 0x023c
+RP_p14_cnt = 0x024c
 
 udp_ack_max = 7
 pkt_in_udp = 5
@@ -56,7 +57,7 @@ def prepare_tx_pkts(dat):
     return dpt_pkts
 
 
-def write_data(dpt_pkts):
+def write_data(dpt_pkts, dptz_size):
     pend_ret = []
     w_idx = 0
     
@@ -110,17 +111,24 @@ def write_data(dpt_pkts):
                         cst['aes_cnt'] = struct.unpack("<H", cnt_rx_[1:])[0]
                         print(f"k_cnt_rx_udp: {cst['aes_cnt']:04x}")
                     
-                    csa_dat = csa_read(RP_w_offset, 6, proxy=True, encrypt=udp_encrypt)
-                    if csa_dat == None:
+                    csa_dat = csa_read(RP_dptz_rx, 18, proxy=True, encrypt=udp_encrypt)
+                    if csa_dat == None or len(csa_dat) < 19:
                         continue
                     print(csa_dat.hex())
-                    csa_ofs, csa_cnt, csa_err = struct.unpack("<IBB", csa_dat[1:])
-                    ack_idx = math.floor(csa_ofs / sub_size)
-                    set_ofs = ack_idx * sub_size
+                    dptz_rx, csa_cnt, csa_err = struct.unpack_from("<I12xBB", csa_dat, 1)
+                    if dptz_rx > dptz_size:
+                        print(f"dptz_rx error: {dptz_rx} > {dptz_size}")
+                        return
+                    if dptz_rx == dptz_size:
+                        print(f"dptz_rx {dptz_rx}, all data received")
+                        w_idx = len(dpt_pkts)
+                        pend_ret.clear()
+                        break
+                    ack_idx = math.floor(dptz_rx / sub_size)
                     set_cnt = dpt_pkts[ack_idx][0] & 7
-                    print(f"csa_offset {csa_ofs} -> {set_ofs} ({w_idx * sub_size}), cnt {csa_cnt} -> {set_cnt}, err {csa_err}")
-                    set_dat = struct.pack("<IBB", set_ofs, set_cnt, 0)
-                    csa_write(RP_w_offset, set_dat, proxy=True, encrypt=udp_encrypt)
+                    print(f"dptz_rx {dptz_rx} -> {ack_idx * sub_size} ({w_idx * sub_size}), cnt {csa_cnt} -> {set_cnt}, err {csa_err}")
+                    set_dat = struct.pack("<BB", set_cnt, 0)
+                    csa_write(RP_p14_cnt, set_dat, proxy=True, encrypt=udp_encrypt)
                     w_idx = ack_idx
                     pend_ret.clear()
                     break
@@ -164,7 +172,7 @@ if __name__ == "__main__":
 
     dpt_pkts = prepare_tx_pkts(bin_data)
     start_time = time.monotonic()
-    write_data(dpt_pkts)
+    write_data(dpt_pkts, len(bin_data))
     end_time = time.monotonic()
     print(f"time: {(end_time-start_time)*1000}")
 
