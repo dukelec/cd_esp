@@ -125,7 +125,7 @@ def csa_read(offset, len_, proxy=False, encrypt=False, mac=None):
     ret = send_command(msg, encrypt=encrypt, mac=mac)
     #cst['csa_cnt'] = (cst['csa_cnt'] + 1) & 0xf
     if ret == None or ret[2] != 0 or ret[0] != 5:
-        print(f'csa_read error at: 0x{offset:x}, len: {len_}, ret: {ret.hex()}')
+        print(f'csa_read error at: 0x{offset:x}, len: {len_}, ret: {ret.hex() if ret else ret}')
         return None
     return ret[2:]
 
