@@ -1,7 +1,8 @@
 CD-ESP
 =======================================
 
-An ESP32-C3-based CDBUS (RS-485) wireless bridge with BLE and Wi-Fi support.
+An ESP32-C3 / ESP32-C5 based CDBUS (RS-485) wireless bridge with BLE and Wi-Fi support
+(dual-band 2.4G + 5G Wi-Fi on ESP32-C5).
 
 
 ## Features
@@ -279,8 +280,13 @@ Parameter table (read/write via CDNET port #05; `F`: retained after power-off, `
 </tr>
 <tr> <td>0x0108</td> <td>wifi_conf</td>         <td>R/W/F</td>  <td>u8</td>     <td>0</td>
      <td>
-        0: Disconnect (improves BLE speed)<br>
-        1: Station mode
+        bit[3:0]:<br>
+        - 0: Disconnect (improves BLE speed)<br>
+        - 1: Station mode<br>
+        bit[7:6] (band, dual-band chips like ESP32-C5 only):<br>
+        - 0: Auto (2.4G + 5G)<br>
+        - 1: 2.4G only<br>
+        - 2: 5G only
      </td>
 </tr>
 <tr> <td>0x0109</td> <td>proxy_sel</td>         <td>R/W</td>    <td>u8</td>     <td>1</td>
@@ -414,7 +420,9 @@ Effect: Changes take effect without reconnection.
 ## Build Instructions
 
 Based on IDF v6.0.2, run `source esp-idf/export.sh`, then execute `src/idf_patchs/patch_all.sh` once.  
-After that, enter the `src` directory, run `idf.py set-target esp32c3` (only required the first time), and then execute `idf.py build`.
+After that, enter the `src` directory, run `idf.py set-target esp32c3` (or `esp32c5`; only required the first time),
+and then execute `idf.py build`. The firmware adapts to the selected target automatically;
+the wifi_conf band bits only take effect on dual-band chips (ESP32-C5).
 
 Firmware can be upgraded by:
  - Using the CDBUS GUI tool to perform RS-485 IAP with the HEX file in the build directory.

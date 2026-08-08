@@ -100,7 +100,7 @@ void configure_led_pwm()
         .timer_num = LEDC_TIMER_1,
         .duty_resolution = LEDC_TIMER_8_BIT,
         .freq_hz = 2000,
-        .clk_cfg = LEDC_USE_APB_CLK
+        .clk_cfg = LEDC_USE_XTAL_CLK // 40MHz on both c3 and c5; c5 has no APB option
     };
     ledc_timer_config(&ledc_timer_buzzer);
 
@@ -120,7 +120,7 @@ void configure_led_pwm()
         .timer_num = LEDC_TIMER_2,
         .duty_resolution = LEDC_TIMER_8_BIT,
         .freq_hz = 100000,
-        .clk_cfg = LEDC_USE_APB_CLK
+        .clk_cfg = LEDC_USE_XTAL_CLK // 40MHz on both c3 and c5; c5 has no APB option
     };
     ledc_timer_config(&ledc_timer_led);
 

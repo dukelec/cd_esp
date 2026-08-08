@@ -14,13 +14,19 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "sdkconfig.h"
+
 #include "esp_log.h"
 #include "esp_event.h"
 #include "hal/cpu_hal.h"
 #include "nvs_flash.h"
 #include "esp_flash.h"
 #include "soc/gpio_reg.h"
+#if CONFIG_IDF_TARGET_ESP32C3
 #include "soc/rtc_cntl_reg.h"
+#else
+#include "soc/lp_aon_reg.h"
+#endif
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 #include "driver/spi_master.h"

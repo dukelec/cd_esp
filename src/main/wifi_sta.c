@@ -351,6 +351,21 @@ void wifi_maintain_task(void)
     if (csa.wifi_state_.disabled)
         return;
 
+#if CONFIG_SOC_WIFI_SUPPORT_5G
+    static uint8_t band_applied = 0; // wifi_conf bit[7:6], 0 or 3: auto, 1: 2.4g only, 2: 5g only
+    uint8_t band_cfg = csa.wifi_conf >> 6;
+    if (band_cfg != band_applied) {
+        wifi_band_mode_t band_mode = (band_cfg == 1 || band_cfg == 2) ? band_cfg : WIFI_BAND_MODE_AUTO;
+        esp_err_t err = esp_wifi_set_band_mode(band_mode);
+        ESP_LOGI(tag, "set band mode %d: %s", band_mode, esp_err_to_name(err));
+        if (err == ESP_OK) {
+            band_applied = band_cfg;
+            if (wifi_connect) // disconnected event resets flags, next cycle re-associates
+                esp_wifi_disconnect();
+        }
+    }
+#endif
+
     if (csa.scan_start && !csa.wifi_state_.connecting) {
         csa.wifi_state_.scan = 1;
         csa.scan_start = 0;
@@ -374,7 +389,7 @@ void wifi_maintain_task(void)
         csa.wifi_state_.scan = 0;
     }
 
-    if (csa.wifi_conf == 1 && !wifi_connect) {
+    if ((csa.wifi_conf & 0xf) == 1 && !wifi_connect) {
         ESP_LOGI(tag, "wifi connecting by wifi_conf");
         wifi_config_t wifi_config = {
             .sta = {
@@ -382,7 +397,7 @@ void wifi_maintain_task(void)
                 .sort_method = WIFI_CONNECT_AP_BY_SIGNAL,
                 .threshold.rssi = -127,
                 .threshold.authmode = WIFI_AUTH_OPEN,
-                .threshold.rssi_5g_adjustment = 0,
+                .threshold.rssi_5g_adjustment = 10, // ~7-9dB natural 2.4g vs 5g path loss gap; prefer 5g within it
             },
         };
         memcpy(wifi_config.sta.ssid, csa.wifi_ssid, 32);
@@ -393,7 +408,7 @@ void wifi_maintain_task(void)
         esp_wifi_connect();
     }
 
-    if (csa.wifi_conf == 0 && wifi_connect) {
+    if ((csa.wifi_conf & 0xf) == 0 && wifi_connect) {
         ESP_LOGI(tag, "wifi disconnect by !wifi_conf");
         wifi_connect = false;
         csa.wifi_state_.connecting = 0;

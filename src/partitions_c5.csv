@@ -1,0 +1,24 @@
+# This file is for esp32c5 only, selected by sdkconfig.defaults.esp32c5 (table offset 0xa000);
+# esp32c3 uses the built-in single_app_large table at the default offset 0x8000.
+#
+# Flash layout comparison (4MB flash), esp32c3 vs esp32c5:
+#
+#   region                     esp32c3             esp32c5
+#   -------------------------  ------------------  ------------------
+#   reserved (rom boot addr)   --                  0x000000-0x002000
+#   bootloader (32KB window)   0x000000-0x008000   0x002000-0x00a000
+#   partition table            0x008000-0x009000   0x00a000-0x00b000
+#   nvs                        0x009000-0x00f000   0x00b000-0x00f000  (24KB -> 16KB, min 12KB)
+#   phy_init (reserved)        0x00f000-0x010000   same
+#   factory app                0x010000-0x187000   same
+#   ota staging / user data    0x187000-0x3ff000   same  (raw flash, no partition)
+#   csa conf page              0x3ff000-0x400000   same  (raw flash, no partition)
+#
+# Everything from 0xf000 up is identical on both chips (phy_init / IAP / OTA / conf addresses
+# shared), and everything below 0x10000 is IAP write-protected by the bootloader (BL_FLASH_PROTECT).
+# phy_init is unused unless CONFIG_ESP_PHY_INIT_DATA_IN_PARTITION is enabled.
+#
+# Name,   Type, SubType, Offset,   Size,     Flags
+nvs,      data, nvs,     0xb000,   0x4000,
+phy_init, data, phy,     0xf000,   0x1000,
+factory,  app,  factory, 0x10000,  0x177000,

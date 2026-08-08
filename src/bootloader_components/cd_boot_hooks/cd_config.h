@@ -10,6 +10,8 @@
 #ifndef __CD_CONFIG_H__
 #define __CD_CONFIG_H__
 
+#include "sdkconfig.h"
+
 #define CDCTL_OSC_CLK       40000000UL // 40MHz
 
 #define CD_FRAME_SIZE       256
@@ -26,7 +28,11 @@
 
 // cross-reset flag (survives software reset, cleared on power-on), keep same in app.
 // STORE0 is unused by the rom / idf. values: (0xcdcd0000 | do_reboot)
+#if CONFIG_IDF_TARGET_ESP32C3
 #define BL_ARGS_REG         RTC_CNTL_STORE0_REG
+#else
+#define BL_ARGS_REG         LP_AON_STORE0_REG
+#endif
 #define BL_ARGS_KEEP        0xcdcd0001  // reboot and stay in bootloader
 #define BL_ARGS_APP         0xcdcd0002  // reboot and boot the app directly
 
@@ -38,7 +44,11 @@
 #include "esp_rom_sys.h"
 #include "esp_rom_spiflash.h"
 #include "soc/soc.h"
+#if CONFIG_IDF_TARGET_ESP32C3
 #include "soc/rtc_cntl_reg.h"
+#else
+#include "soc/lp_aon_reg.h"
+#endif
 #include "soc/gpio_struct.h"
 #include "soc/gpio_reg.h"
 #include "soc/clk_tree_defs.h"

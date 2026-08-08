@@ -166,7 +166,7 @@ void csa_list_show(void)
     CSA_SHOW(0, ble_itvl_max, "");
     CSA_SHOW(0, wifi_ssid, "");
     CSA_SHOW(0, wifi_pwd, "");
-    CSA_SHOW(0, wifi_conf, "0: turn off, 1: station mode");
+    CSA_SHOW(0, wifi_conf, "bit[3:0]- 0: turn off, 1: station; bit[7:6]- band: 0: auto, 1: 2.4g, 2: 5g");
     d_debug("\n");
 
     CSA_SHOW(0, proxy_sel, "1: ble, 2: wifi");

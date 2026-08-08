@@ -10,3 +10,15 @@ index 3b5f2177af3..f1f57dd6bca 100644
      *libesp_hw_support.a:rtc_time.*(.literal .text .literal.* .text.*) \
      *libesp_hw_support.a:regi2c_ctrl.*(.literal .text .literal.* .text.*) \
      *libefuse.a:*.*(.literal .text .literal.* .text.*) \
+diff --git a/components/bootloader/subproject/main/ld/esp32c5/bootloader.sections.ld.in b/components/bootloader/subproject/main/ld/esp32c5/bootloader.sections.ld.in
+index 4b2e639c228..6944254db9c 100644
+--- a/components/bootloader/subproject/main/ld/esp32c5/bootloader.sections.ld.in
++++ b/components/bootloader/subproject/main/ld/esp32c5/bootloader.sections.ld.in
+@@ -40,6 +40,7 @@
+     *libesp_security.a:esp_crypto_periph_clk.*(.literal .text .literal.* .text.*) \
+     *libesp_security.a:esp_crypto_lock.*(.literal .text .literal.* .text.*) \
+     *libesp_hw_support.a:rtc_clk.*(.literal .text .literal.* .text.*) \
++    *libesp_hw_support.a:rtc_clk_init.*(.literal .text .literal.* .text.*) \
+     *libesp_hw_support.a:rtc_time.*(.literal .text .literal.* .text.*) \
+     *libesp_hw_support.a:regi2c_ctrl.*(.literal .text .literal.* .text.*) \
+     *libesp_hal_regi2c.a:regi2c_impl.*(.literal .text .literal.* .text.*) \

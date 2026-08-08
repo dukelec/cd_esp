@@ -10,6 +10,7 @@
 #ifndef __CD_MAIN_H__
 #define __CD_MAIN_H__
 
+#include "sdkconfig.h"
 #include "cd_utils.h"
 #include "cd_list.h"
 #include "cdctl_it.h"
@@ -20,7 +21,11 @@
 #define APP_CONF_VER        0x0201
 
 // cross-reset flag to the bootloader (keep same as bootloader cd_config.h)
+#if CONFIG_IDF_TARGET_ESP32C3
 #define BL_ARGS_REG         RTC_CNTL_STORE0_REG
+#else
+#define BL_ARGS_REG         LP_AON_STORE0_REG
+#endif
 
 #define FRAME_MAX           40
 
@@ -60,7 +65,7 @@ typedef struct {
     uint8_t         ble_itvl_max;
     uint8_t         wifi_ssid[32];
     uint8_t         wifi_pwd[64];
-    uint8_t         wifi_conf;      // 0: disconnect, 1: station
+    uint8_t         wifi_conf;      // bit[3:0]- 0: disconnect, 1: station; bit[7:6]- band: 0: auto, 1: 2.4g, 2: 5g
 
     // end of flash
     // below read only without key auth

@@ -17,7 +17,11 @@
 
 // cross-reset flag (survives software reset, cleared on power-on), keep same in app.
 // STORE0 is unused by the rom / idf. values: (0xcdcd0000 | do_reboot)
+#if CONFIG_IDF_TARGET_ESP32C3
 #define BL_ARGS_REG         RTC_CNTL_STORE0_REG
+#else
+#define BL_ARGS_REG         LP_AON_STORE0_REG
+#endif
 #define BL_ARGS_KEEP        0xcdcd0001  // reboot and stay in bootloader
 #define BL_ARGS_APP         0xcdcd0002  // reboot and boot the app directly
 
