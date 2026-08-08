@@ -413,7 +413,7 @@ Effect: Changes take effect without reconnection.
 
 ## Build Instructions
 
-Based on IDF v6.0.1, run `source esp-idf/export.sh`, then execute `src/idf_patchs/patch_all.sh` once.  
+Based on IDF v6.0.2, run `source esp-idf/export.sh`, then execute `src/idf_patchs/patch_all.sh` once.  
 After that, enter the `src` directory, run `idf.py set-target esp32c3` (only required the first time), and then execute `idf.py build`.
 
 Firmware can be upgraded by:

@@ -13,7 +13,7 @@ from _encrypt import *
 
 CMD_TGT_PORT = 0xcdcd
 
-TARGET_IP = "cd-esp.local"
+TARGET_IP = "cd-esp-xxxx.local"
 #TARGET_IP = "240e:03b4:d0e4:f930:de1e:d5ff:fed7:2248"
 #TARGET_IP = "192.168.44.83"
 

@@ -1,12 +1,12 @@
-diff --git a/components/bootloader/subproject/main/ld/esp32c3/bootloader.ld.in b/components/bootloader/subproject/main/ld/esp32c3/bootloader.ld.in
-index 8c8d136dfb..8bd80ae979 100644
---- a/components/bootloader/subproject/main/ld/esp32c3/bootloader.ld.in
-+++ b/components/bootloader/subproject/main/ld/esp32c3/bootloader.ld.in
-@@ -94,6 +94,7 @@ SECTIONS
-     *libhal.a:efuse_hal.*(.literal .text .literal.* .text.*)
-     *libesp_hal_wdt.a:wdt_hal_iram.*(.literal .text .literal.* .text.*)
-     *libesp_hw_support.a:rtc_clk.*(.literal .text .literal.* .text.*)
-+    *libesp_hw_support.a:rtc_clk_init.*(.literal .text .literal.* .text.*)
-     *libesp_hw_support.a:rtc_time.*(.literal .text .literal.* .text.*)
-     *libesp_hw_support.a:regi2c_ctrl.*(.literal .text .literal.* .text.*)
-     *libefuse.a:*.*(.literal .text .literal.* .text.*)
+diff --git a/components/bootloader/subproject/main/ld/esp32c3/bootloader.sections.ld.in b/components/bootloader/subproject/main/ld/esp32c3/bootloader.sections.ld.in
+index 3b5f2177af3..f1f57dd6bca 100644
+--- a/components/bootloader/subproject/main/ld/esp32c3/bootloader.sections.ld.in
++++ b/components/bootloader/subproject/main/ld/esp32c3/bootloader.sections.ld.in
+@@ -33,6 +33,7 @@
+     *libhal.a:efuse_hal.*(.literal .text .literal.* .text.*) \
+     *libesp_hal_wdt.a:wdt_hal_iram.*(.literal .text .literal.* .text.*) \
+     *libesp_hw_support.a:rtc_clk.*(.literal .text .literal.* .text.*) \
++    *libesp_hw_support.a:rtc_clk_init.*(.literal .text .literal.* .text.*) \
+     *libesp_hw_support.a:rtc_time.*(.literal .text .literal.* .text.*) \
+     *libesp_hw_support.a:regi2c_ctrl.*(.literal .text .literal.* .text.*) \
+     *libefuse.a:*.*(.literal .text .literal.* .text.*) \

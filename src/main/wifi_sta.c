@@ -57,10 +57,14 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6) {
         ip_event_got_ip6_t* event = (ip_event_got_ip6_t*) event_data;
         ESP_LOGI(tag, "event: got ip6:" IPV6STR, IPV62STR(event->ip6_info.ip));
-        for (int i = 1; i < 4; i++) {
-            if (get_unaligned16(csa.local_ip[i]) == 0xffff) {
-                memcpy(csa.local_ip[i], &event->ip6_info.ip, 16);
-                break;
+        if (esp_netif_ip6_get_addr_type(&event->ip6_info.ip) == ESP_IP6_ADDR_IS_LINK_LOCAL) {
+            memcpy(csa.local_ip[1], &event->ip6_info.ip, 16); // local_ip[1] fixed for link-local
+        } else {
+            for (int i = 2; i < 4; i++) {
+                if (get_unaligned16(csa.local_ip[i]) == 0xffff) {
+                    memcpy(csa.local_ip[i], &event->ip6_info.ip, 16);
+                    break;
+                }
             }
         }
 
