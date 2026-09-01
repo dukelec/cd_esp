@@ -319,6 +319,9 @@ Parameter table (read/write via CDNET port #05; `F`: retained after power-off, `
 <tr> <td>0x0134</td> <td>ble_itvl_cur</td>      <td>R</td>      <td>u8</td>     <td>--</td>
      <td>BLE current connection interval</td>
 </tr>
+<tr> <td>0x0147</td> <td>wifi_rssi</td>         <td>R</td>      <td>i8</td>     <td>0x7f</td>
+     <td>RSSI of the connected AP (dBm), 0x7f: not connected</td>
+</tr>
 <tr> <td>0x0148</td> <td>wifi_state</td>        <td>R</td>      <td>u8</td>     <td>0</td>
      <td>
         - bit0 = 1: Wi-Fi scan in progress<br>

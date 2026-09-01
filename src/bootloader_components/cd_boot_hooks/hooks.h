@@ -13,7 +13,7 @@
 #include "cd_utils.h"
 #include "cdctl.h"
 
-#define BL_SW_VER           "v1.3"
+#define BL_SW_VER           "v2.0"
 
 // cross-reset flag (survives software reset, cleared on power-on), keep same in app.
 // STORE0 is unused by the rom / idf. values: (0xcdcd0000 | do_reboot)
@@ -38,7 +38,7 @@
 
 // keep same as cd_main.h
 #define APP_CONF_ADDR       0x003ff000 // last page
-#define APP_CONF_VER        0x0200
+#define APP_CONF_VER        0x0300
 
 // phase 1: low-speed (115200) window, slow blink;
 // phase 2: switch to user baud, fast blink; then boot app

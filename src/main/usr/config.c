@@ -9,9 +9,6 @@
 
 #include "cd_main.h"
 
-#define ONCE_PAGE_SIZE  4096
-
-
 const csa_t csa_dft = {
         .magic_code = 0xcdcd,
         .conf_ver = APP_CONF_VER,
@@ -49,6 +46,7 @@ void load_conf(void)
     csa.remote_port = 0xffff;
     memset(csa.local_ip, 0xff, sizeof(csa.local_ip));
     memset(csa.scan_rssi, 127, sizeof(csa.scan_rssi));
+    csa.wifi_rssi = 127;
     csa.wifi_state = 0x80;
     bus_mac = csa.bus_cfg.mac;
 }
@@ -183,6 +181,7 @@ void csa_list_show(void)
     CSA_SHOW(0, ble_itvl_cur, "");
     d_debug("\n");
 
+    CSA_SHOW(0, wifi_rssi, "RSSI of connected ap, 0x7f: not connected");
     CSA_SHOW(1, wifi_state, "{disabled, 2'd0, connecting, 2'd0, connected, scan}");
     CSA_SHOW(2, remote_ip, "Client ip, starts with ffff: empty");
     CSA_SHOW(0, remote_port, "Client udp port, 0xffff: empty");

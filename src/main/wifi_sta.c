@@ -34,6 +34,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
         ESP_LOGI(tag, "event: sta disconnected");
         csa.wifi_state_.connected = 0;
         csa.wifi_state_.connecting = 0;
+        csa.wifi_rssi = 127;
         wifi_connect = false;
         udp_src_addr_valid = false;
         v6_on = false;
@@ -413,6 +414,11 @@ void wifi_maintain_task(void)
         wifi_connect = false;
         csa.wifi_state_.connecting = 0;
         esp_wifi_disconnect();
+    }
+
+    if (csa.wifi_state_.connected) {
+        int rssi;
+        csa.wifi_rssi = (esp_wifi_sta_get_rssi(&rssi) == ESP_OK) ? rssi : 127;
     }
 
     if (!v6_on && csa.wifi_state_.connected) {

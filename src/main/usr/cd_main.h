@@ -18,7 +18,7 @@
 #include "modbus_crc.h"
 
 #define APP_CONF_ADDR       0x003ff000 // last page
-#define APP_CONF_VER        0x0201
+#define APP_CONF_VER        0x0300
 
 // cross-reset flag to the bootloader (keep same as bootloader cd_config.h)
 #if CONFIG_IDF_TARGET_ESP32C3
@@ -87,7 +87,8 @@ typedef struct {
     bool            ble_connect;
     uint32_t        t_ble_connect;
 
-    uint8_t         _reserved6[12];
+    uint8_t         _reserved6[11];
+    int8_t          wifi_rssi;      // rssi of connected ap, 127: not connected
     union {
         uint8_t wifi_state;
         struct {
