@@ -27,7 +27,6 @@ cdctl_dev_t r_dev = {0}; // CDBUS
 
 list_head_t ble_rx_head = {0};
 list_head_t udp_rx_head = {0};
-list_head_t local_tx_head = {0}; // only dispatch_task calls cdctl_send_frame, avoid race
 
 TaskHandle_t dispatch_task_handle = NULL;
 static TaskHandle_t button_task_handle = NULL;
@@ -178,13 +177,10 @@ static void led_set_g(uint8_t duty_g)
 static void dispatch_task(void *arg)
 {
     while (true) {
-        if (!r_dev.rx_head.first && !ble_rx_head.first && !udp_rx_head.first && !local_tx_head.first) {
+        if (!r_dev.rx_head.first && !ble_rx_head.first && !udp_rx_head.first) {
             ulTaskNotifyTake(pdTRUE, 100 / portTICK_PERIOD_MS);
             continue;
         }
-        cd_frame_t *frm = cd_list_get(&local_tx_head);
-        if (frm)
-            cdctl_send_frame(&r_dev.cd_dev, frm);
         comm_service_poll();
     }
 }
@@ -264,9 +260,7 @@ static int multi_output_vprintf(const char *fmt, va_list args) {
                 frm->dat[3] = 0x40;
                 frm->dat[4] = 9;
                 memcpy(frm->dat + 5, buf, len);
-                cd_list_put(&local_tx_head, frm);
-                if (dispatch_task_handle)
-                    xTaskNotifyGive(dispatch_task_handle);
+                cdctl_send_frame(&r_dev.cd_dev, frm); // safe from any task, entry is atomic
             }
         }
     }
@@ -284,7 +278,7 @@ void cd_main_early(void)
 
     load_conf();
     cdctl_spi_init();
-    cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, &r_int, CDCTL_INT_PIN);
+    cdctl_dev_init(&r_dev, &frame_free_head, &csa.bus_cfg, &r_spi, &r_int);
 
     gpio_config_t io_conf_cd_int_n = {
         .intr_type = GPIO_INTR_NEGEDGE,
