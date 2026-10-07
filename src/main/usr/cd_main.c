@@ -90,7 +90,7 @@ static void cdctl_spi_init(void)
 }
 
 
-// the 40MHz clock for cdctl is output by the bootloader (clk_out on mco pin)
+// the xtal clock (c3: 40MHz, c5: 48MHz) for cdctl is output by the bootloader (clk_out on mco pin)
 void configure_led_pwm()
 {
     // buzzer
@@ -99,7 +99,7 @@ void configure_led_pwm()
         .timer_num = LEDC_TIMER_1,
         .duty_resolution = LEDC_TIMER_8_BIT,
         .freq_hz = 2000,
-        .clk_cfg = LEDC_USE_XTAL_CLK // 40MHz on both c3 and c5; c5 has no APB option
+        .clk_cfg = LEDC_USE_XTAL_CLK // c3: 40MHz, c5: 48MHz; c5 has no APB option
     };
     ledc_timer_config(&ledc_timer_buzzer);
 
@@ -119,7 +119,7 @@ void configure_led_pwm()
         .timer_num = LEDC_TIMER_2,
         .duty_resolution = LEDC_TIMER_8_BIT,
         .freq_hz = 100000,
-        .clk_cfg = LEDC_USE_XTAL_CLK // 40MHz on both c3 and c5; c5 has no APB option
+        .clk_cfg = LEDC_USE_XTAL_CLK // c3: 40MHz, c5: 48MHz; c5 has no APB option
     };
     ledc_timer_config(&ledc_timer_led);
 

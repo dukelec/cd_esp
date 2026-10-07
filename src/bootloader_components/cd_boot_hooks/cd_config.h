@@ -12,7 +12,11 @@
 
 #include "sdkconfig.h"
 
-#define CDCTL_OSC_CLK       40000000UL // 40MHz
+#if CONFIG_IDF_TARGET_ESP32C3
+#define CDCTL_OSC_CLK       40000000UL // xtal 40MHz, output on mco pin
+#else // c5
+#define CDCTL_OSC_CLK       48000000UL // xtal 48MHz, output on mco pin
+#endif
 
 #define CD_FRAME_SIZE       256
 #define CDN_MAX_PAYLOAD     251

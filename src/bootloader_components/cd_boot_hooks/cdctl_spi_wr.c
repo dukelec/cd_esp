@@ -54,7 +54,7 @@ static void gpio_out_init(uint32_t pin, bool val)
 
 void mco_clock_init(void)
 {
-    // 40MHz clock for cdctl: xtal 40MHz -> clk_out ch1 -> mco pin (no divider on esp32c3)
+    // xtal clock for cdctl (c3: 40MHz, c5: 48MHz) -> clk_out ch1 -> mco pin (no divider)
     clk_ll_bind_output_channel(CLKOUT_SIG_XTAL, CLKOUT_CHANNEL_1);
     clk_ll_enable_output_channel(CLKOUT_CHANNEL_1, true);
     gpio_ll_func_sel(&GPIO, BL_MCO_PIN, PIN_FUNC_GPIO);

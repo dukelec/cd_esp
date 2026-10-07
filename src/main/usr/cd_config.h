@@ -10,7 +10,13 @@
 #ifndef __CD_CONFIG_H__
 #define __CD_CONFIG_H__
 
-#define CDCTL_OSC_CLK       40000000UL // 40MHz
+#include "sdkconfig.h"
+
+#if CONFIG_IDF_TARGET_ESP32C3
+#define CDCTL_OSC_CLK       40000000UL // xtal 40MHz, output on mco pin
+#else // c5
+#define CDCTL_OSC_CLK       48000000UL // xtal 48MHz, output on mco pin
+#endif
 
 #define CD_ARCH_SPI_DMA
 
