@@ -9,6 +9,9 @@
 
 #include "hooks.h"
 #include "modbus_crc.h"
+#if CONFIG_IDF_TARGET_ESP32C5
+#include "esp_private/rtc_clk.h"
+#endif
 
 #define APP_ADDR     0x10000
 #define APP_MAX     0x177000
@@ -133,6 +136,21 @@ static void led_set(bool on)
 }
 
 
+#if CONFIG_IDF_TARGET_ESP32C5
+// The hp system reset keeps the bbpll running with a stale cal_done flag, then rtc_clk_init() of
+// the next 2nd stage bootloader switches the cpu to the pll before it is re-calibrated, and the cpu
+// stalls until the rtc wdt fires. So reset the cpu only, as esp_restart() of the app does,
+// then the next bootloader skips rtc_clk_init().
+static void bl_restart(void)
+{
+    rtc_clk_cpu_set_to_default_config(); // cpu back to xtal, keep the bbpll on
+    esp_rom_software_reset_cpu(0);
+}
+#else
+#define bl_restart  esp_rom_software_reset_system
+#endif
+
+
 static void wdt_feed(void)
 {
     wdt_hal_context_t rwdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
@@ -202,7 +220,7 @@ void bootloader_after_init(void) {
             esp_rom_delay_us(10000);
             REG_WRITE(BL_ARGS_REG, 0xcdcd0000 | csa.do_reboot);
             d_info("bl_comm: reboot (%d)...\n", csa.do_reboot);
-            esp_rom_software_reset_system();
+            bl_restart();
         }
 
         if (!csa.keep_in_bl) {

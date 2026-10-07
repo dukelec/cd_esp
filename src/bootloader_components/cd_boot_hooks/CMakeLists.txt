@@ -22,6 +22,7 @@ idf_component_register(
         soc
         log
         esp_rom
+        esp_hw_support
         esp_hal_gpio
         esp_hal_clock
         esp_hal_wdt
