@@ -58,7 +58,8 @@ int sent_cmd(uint8_t dst_mac, uint8_t *d, uint8_t d_len, bool reply, cd_frame_t 
 static void send_frame(cd_frame_t *frame, uint8_t p_len)
 {
     frame->dat[2] = p_len + 2;
-    swap(frame->dat[0], frame->dat[1]); // swap mac
+    frame->dat[1] = frame->dat[0];
+    frame->dat[0] = bus_mac; // reply from own mac, even for broadcast cmd
     swap(frame->dat[3], frame->dat[4]); // swap port
     if (frame->intf == INTF_BLE) {
         BaseType_t ret = xQueueSend(ble_notify_queue, (void *) &frame, (TickType_t) 0);
