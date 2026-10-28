@@ -33,3 +33,6 @@ idf_component_register(
         esp_driver_spi
         esp_coex
 )
+
+# "-Wextra" enables -Woverride-init, allow "default + override" style initializers (e.g. usr/config.c)
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-override-init)

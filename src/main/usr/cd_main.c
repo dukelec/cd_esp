@@ -230,8 +230,20 @@ void cd_main_maintain_task(void)
 
     if (get_systick() - t_last >= 5000) {
         t_last = get_systick();
-        ESP_LOGI(tag, "k_st: %d, ble_conn %d, t_ble_conn %08lx, rx %ld, free %ld",
-                csa.k_st_ble, csa.ble_connect, csa.t_ble_connect, ble_rx_head.len, esp_get_free_heap_size());
+        ESP_LOGI(tag, "k_st: %d, ble_conn %d, t_ble_conn %08lx, rx %ld, free %ld (min %ld)",
+                csa.k_st_ble, csa.ble_connect, csa.t_ble_connect, ble_rx_head.len,
+                esp_get_free_heap_size(), esp_get_minimum_free_heap_size());
+#if 0   // uxTaskGetStackHighWaterMark scans the stack byte by byte, no lock
+        ESP_LOGI(tag, "stack min free: button %u, dispatch %u, common %u",
+                uxTaskGetStackHighWaterMark(button_task_handle),
+                uxTaskGetStackHighWaterMark(dispatch_task_handle), uxTaskGetStackHighWaterMark(NULL)); // common_task
+        // xTaskGetHandle suspends the scheduler while it walks the task lists
+        ESP_LOGI(tag, "stack min free: ble_notify %u, udp_server %u, udp_notify %u, mdns %u",
+                uxTaskGetStackHighWaterMark(xTaskGetHandle("notify_task")),
+                uxTaskGetStackHighWaterMark(xTaskGetHandle("udp_server")),
+                uxTaskGetStackHighWaterMark(xTaskGetHandle("udp_notify_task")),
+                uxTaskGetStackHighWaterMark(xTaskGetHandle("mdns_server")));
+#endif
         ESP_LOGI(tag, "bus: %d, pend t %ld r %ld, irq %d, r %ld (lost %ld err %ld full %ld), t %ld (cd %ld err %ld)",
                 r_dev.state, r_dev.tx_head.len, r_dev.rx_head.len, !gpio_get_val(r_dev.int_n),
                 r_dev.rx_cnt, r_dev.rx_lost_cnt, r_dev.rx_error_cnt, r_dev.rx_no_free_node_cnt,

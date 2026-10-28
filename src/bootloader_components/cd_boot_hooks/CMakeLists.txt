@@ -27,3 +27,6 @@ idf_component_register(
         esp_hal_clock
         esp_hal_wdt
 )
+
+# "-Wextra" enables -Woverride-init, allow "default + override" style initializers (e.g. usr/config.c)
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-override-init)
