@@ -24,7 +24,7 @@ def invoke_cmd(cmd):
 
 
 def compute_version():
-    _ret, version_full = invoke_cmd_r('git describe --dirty --always --tags')
+    _ret, version_full = invoke_cmd_r('git describe --long --dirty --always --tags')
     _ret, version_fallback = invoke_cmd_r('git describe --always --tags')
     version_mid = re.sub(r".*_v", "", version_full.strip())
     version_mid = re.sub(r"-g.*", "", version_mid)

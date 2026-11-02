@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.5)
 
 execute_process(
-    COMMAND git describe --dirty --always --tags
+    COMMAND git describe --long --dirty --always --tags
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_VERSION_FULL
     OUTPUT_STRIP_TRAILING_WHITESPACE

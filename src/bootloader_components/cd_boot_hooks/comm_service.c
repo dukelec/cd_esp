@@ -33,6 +33,8 @@ void init_info_str(void)
     cpu_id[12] = '\0';
     strcpy(info_str, "M: cd-esp (bl); S: ");
     strcat(info_str, cpu_id);
+    strcat(info_str, "; HW: ");
+    strcat(info_str, CONFIG_IDF_TARGET + 5); // c3 / c5, without the "esp32" prefix
     strcat(info_str, "; SW: " BL_SW_VER);
     d_info("bl_comm: %s\n", info_str);
 }

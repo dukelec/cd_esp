@@ -83,7 +83,9 @@ static void send_frame(cd_frame_t *frame, uint8_t p_len)
 static void init_info_str(void)
 {
     // M: model; S: serial string; HW: hardware version; SW: software version
-    sprintf(info_str, "M: cd-esp; S: %s; SW: %s", cpu_id, SW_VER);
+    // HW: the chip (c3 / c5), the images of the two are not interchangeable,
+    // CONFIG_IDF_TARGET without the "esp32" prefix
+    sprintf(info_str, "M: cd-esp; S: %s; HW: %s; SW: %s", cpu_id, CONFIG_IDF_TARGET + 5, SW_VER);
     d_info("info: %s, git: %s\n", info_str, SW_VER_FULL);
 }
 

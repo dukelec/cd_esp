@@ -198,7 +198,7 @@ Parameter table (read/write via CDNET port #05; `F`: retained after power-off, `
 <tr> <td>0x0000</td> <td>magic_code</td>        <td>R/W</td>    <td>u16</td>    <td>0xcdcd</td>
      <td>Fixed value used to check whether the flash contains a valid register table</td>
 </tr>
-<tr> <td>0x0002</td> <td>conf_ver</td>          <td>R/W</td>    <td>u16</td>    <td>0x0201</td>
+<tr> <td>0x0002</td> <td>conf_ver</td>          <td>R/W</td>    <td>u16</td>    <td>0x0300</td>
      <td>Register table version: high byte: major, low byte: minor</td>
 </tr>
 <tr> <td>0x0004</td> <td>conf_from</td>         <td>R</td>      <td>u8</td>     <td>0</td>
