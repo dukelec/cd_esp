@@ -371,6 +371,8 @@ void wifi_maintain_task(void)
         csa.wifi_state_.scan = 1;
         csa.scan_start = 0;
         memset(csa.scan_rssi, 127, sizeof(csa.scan_rssi));
+        memset(csa.scan_auth, 0, sizeof(csa.scan_auth));
+        memset(csa.scan_ssid, 0, sizeof(csa.scan_ssid));
         uint16_t number = 20;
         uint16_t ap_count = 0;
         memset(ap_info, 0, sizeof(ap_info));
