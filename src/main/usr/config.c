@@ -156,6 +156,7 @@ void csa_list_show(void)
     d_debug("\n");
 
     CSA_SHOW(1, p_mac, "Predefined remote rs485 address");
+    CSA_SHOW(0, wifi_cc, "WiFi country code, e.g. US; empty: auto");
     CSA_SHOW(0, k_en, "Key enable (bit0: ble, bit1: udp)");
     CSA_SHOW(0, k_pwd, "Key string");
     d_debug("\n");

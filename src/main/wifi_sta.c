@@ -352,6 +352,18 @@ void wifi_maintain_task(void)
     if (csa.wifi_state_.disabled)
         return;
 
+    static uint8_t cc_applied[2] = {0xff}; // apply at boot too: the driver keeps the last country in nvs
+    if (memcmp(cc_applied, csa.wifi_cc, 2)) {
+        memcpy(cc_applied, csa.wifi_cc, 2);
+        char cc[3] = "01"; // 01: world safe mode, idf default
+        if (csa.wifi_cc[0])
+            memcpy(cc, csa.wifi_cc, 2);
+        // auto policy ignores the configured country for scan (always all channels), so manual when set
+        bool auto_cc = !csa.wifi_cc[0];
+        esp_err_t err = esp_wifi_set_country_code(cc, auto_cc);
+        ESP_LOGI(tag, "set country %s (%s): %s", cc, auto_cc ? "auto" : "manual", esp_err_to_name(err));
+    }
+
 #if CONFIG_SOC_WIFI_SUPPORT_5G
     static uint8_t band_applied = 0; // wifi_conf bit[7:6], 0 or 3: auto, 1: 2.4g only, 2: 5g only
     uint8_t band_cfg = csa.wifi_conf >> 6;
@@ -376,7 +388,16 @@ void wifi_maintain_task(void)
         uint16_t number = 20;
         uint16_t ap_count = 0;
         memset(ap_info, 0, sizeof(ap_info));
+#if CONFIG_SOC_WIFI_SUPPORT_5G
+        // default 360ms passive per ch is slow with 5g: dfs channels are passive only
+        // active time must stay default with bt enabled (driver warns otherwise, coex slices assume it)
+        static const wifi_scan_config_t scan_conf = {
+            .scan_time.passive = 210, // > 2 beacon intervals (102.4ms), tolerates one lost beacon
+        };
+        esp_wifi_scan_start(&scan_conf, true);
+#else
         esp_wifi_scan_start(NULL, true);
+#endif
 
         ESP_LOGI(tag, "max ap number ap_info can hold = %u", number);
         ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));

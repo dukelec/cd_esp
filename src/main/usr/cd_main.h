@@ -58,7 +58,8 @@ typedef struct {
     uint8_t         _reserved1[92];
     uint8_t         p_mac;          // predefined remote rs485 address
 
-    uint8_t         _reserved2[12];
+    uint8_t         _reserved2[10];
+    char            wifi_cc[2];     // country code, e.g. "US", empty: auto
     uint8_t         k_en;           // bit0: ble, bit1: udp
     uint8_t         k_pwd[24];
 
